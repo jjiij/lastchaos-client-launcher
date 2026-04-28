@@ -1,0 +1,59 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller pillow
+
+      - name: Build launcher
+        run: |
+          pyinstaller --name LastChaosLauncher --onefile --windowed --icon LC.ico --add-data "background.jpg;." main.py
+
+      - name: Find built exe
+        run: |
+          Get-ChildItem . -Filter "*.exe" -Recurse -File | Select -Expand FullName
+
+      - name: Create zip archive
+        run: |
+          Compress-Archive -Path "dist/LastChaosLauncher.exe" -DestinationPath "lastchaos-windows-x64.zip"
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: lastchaos-windows-x64.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to latest
+        uses: csexton/release-asset-action@master
+        with:
+          file: lastchaos-windows-x64.zip
+          repo: ${{ github.repository }}
+          tag: latest
+          overwrite: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
