@@ -37,20 +37,6 @@ jobs:
         run: |
           Compress-Archive -Path "dist/LastChaosLauncher.exe" -DestinationPath "lastchaos-windows-x64.zip"
 
-      - name: Delete old release
-        run: |
-          $headers = @{
-             "Authorization" = "token ${{ secrets.GITHUB_TOKEN }}"
-             "Accept" = "application/vnd.github+json"
-           }
-          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases" -Headers $headers
-          foreach ($rel in $releases) {
-            if ($rel.tag_name -eq "latest") {
-              Write-Host "Deleting release: $($rel.id)"
-              Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$($rel.id)" -Headers $headers -Method Delete
-            }
-          }
-
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
