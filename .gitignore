@@ -1,0 +1,14 @@
+# Build output
+__pycache__/
+*.pyc
+dist/
+build/
+*.log
+
+# Large debug files
+Version 4 Source Code.zip
+BinReaderWriter/
+
+# IDE
+*.suo
+*.user

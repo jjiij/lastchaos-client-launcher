@@ -1,0 +1,3 @@
+@echo off
+echo Starting LastChaos Launcher...
+start LC.exe
