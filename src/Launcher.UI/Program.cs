@@ -55,8 +55,7 @@ internal static class Program
 
         if (command.Command == LauncherCommand.InstallDependencies)
         {
-            var docs = Path.Combine(root, "Launcher", "Docs");
-            await depInstaller.InstallDependenciesAsync(docs);
+            await depInstaller.InstallDependenciesAsync(root);
             return;
         }
 

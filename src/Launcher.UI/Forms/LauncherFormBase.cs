@@ -311,6 +311,33 @@ public abstract class LauncherFormBase : Form
 
     private async Task LaunchGameAsync()
     {
+        if (!HasVc100Runtime())
+        {
+            var installPrompt = MessageBox.Show(
+                "Required runtime files (MSVCP100/MSVCR100) are missing.\n\nInstall dependencies now?",
+                "Install Dependencies",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (installPrompt == DialogResult.Yes)
+            {
+                StatusLabel.Text = "Installing VC++/DirectX dependencies...";
+                _downloadDetailsLabel.Text = "UAC prompt may appear.";
+                var installOk = await DependencyInstaller.InstallDependenciesAsync(AppContext.BaseDirectory);
+                if (!installOk)
+                {
+                    StatusLabel.Text = "Dependency install failed or was cancelled";
+                    _downloadDetailsLabel.Text = "Run launcher as admin and retry.";
+                    return;
+                }
+            }
+            else
+            {
+                StatusLabel.Text = "Cannot launch without required runtime";
+                return;
+            }
+        }
+
         var ok = await GameLauncher.LaunchAsync(AppContext.BaseDirectory, Settings.NkspLaunchParameter);
         StatusLabel.Text = ok ? "Game launched" : "Nksp.exe not found";
     }
@@ -326,6 +353,33 @@ public abstract class LauncherFormBase : Form
     {
         var nksp = Path.Combine(AppContext.BaseDirectory, "Bin", "Nksp.exe");
         return File.Exists(nksp);
+    }
+
+    private static bool HasVc100Runtime()
+    {
+        var probes = new List<string>
+        {
+            Path.Combine(AppContext.BaseDirectory, "Bin", "msvcp100.dll"),
+            Path.Combine(AppContext.BaseDirectory, "Bin", "msvcr100.dll")
+        };
+
+        var systemDir = Environment.SystemDirectory;
+        if (!string.IsNullOrWhiteSpace(systemDir))
+        {
+            probes.Add(Path.Combine(systemDir, "msvcp100.dll"));
+            probes.Add(Path.Combine(systemDir, "msvcr100.dll"));
+        }
+
+        var winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        if (!string.IsNullOrWhiteSpace(winDir))
+        {
+            probes.Add(Path.Combine(winDir, "SysWOW64", "msvcp100.dll"));
+            probes.Add(Path.Combine(winDir, "SysWOW64", "msvcr100.dll"));
+        }
+
+        var hasMsvcp = probes.Any(p => p.EndsWith("msvcp100.dll", StringComparison.OrdinalIgnoreCase) && File.Exists(p));
+        var hasMsvcr = probes.Any(p => p.EndsWith("msvcr100.dll", StringComparison.OrdinalIgnoreCase) && File.Exists(p));
+        return hasMsvcp && hasMsvcr;
     }
 
     private void UpdatePrimaryButtonLabel()
