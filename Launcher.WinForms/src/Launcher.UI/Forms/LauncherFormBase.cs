@@ -1,3 +1,4 @@
+using System.Drawing.Drawing2D;
 using System.Text.Json;
 using Launcher.Core.Contracts;
 using Launcher.Core.Enums;
@@ -15,19 +16,25 @@ public abstract class LauncherFormBase : Form
     protected readonly IGameLauncher GameLauncher;
     protected readonly IShortcutService ShortcutService;
 
-    protected readonly Label StatusLabel = new() { AutoSize = false, Width = 740, Height = 40, Top = 460, Left = 20, ForeColor = Color.White, BackColor = Color.FromArgb(150, 0, 0, 0) };
-    protected readonly ProgressBar GameProgress = new() { Left = 20, Top = 510, Width = 740, Height = 18 };
-    protected readonly ProgressBar AssetsProgress = new() { Left = 20, Top = 536, Width = 740, Height = 18 };
-    protected readonly Label GameProgressLabel = new() { Left = 20, Top = 492, Width = 200, Height = 16, Text = "Game Download", ForeColor = Color.White, BackColor = Color.Transparent };
-    protected readonly Label AssetsProgressLabel = new() { Left = 20, Top = 518, Width = 200, Height = 16, Text = "Assets Download", ForeColor = Color.White, BackColor = Color.Transparent };
+    private readonly Panel _newsPanel = new() { Left = 24, Top = 24, Width = 360, Height = 500 };
+    private readonly Label _newsTitle = new() { Left = 18, Top = 16, Width = 320, Height = 30, Text = "NEWS", ForeColor = Color.White, Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold) };
+    private readonly RichTextBox _newsBox = new() { Left = 18, Top = 56, Width = 324, Height = 420, ReadOnly = true, BorderStyle = BorderStyle.None };
 
-    protected readonly Button PrimaryButton = new() { Left = 20, Top = 566, Width = 300, Height = 56, Text = "Download / Update", Font = new Font("Segoe UI", 13, FontStyle.Bold) };
-    protected readonly Button PauseButton = new() { Left = 332, Top = 566, Width = 120, Height = 56, Text = "Pause" };
-    protected readonly Button RepairButton = new() { Left = 464, Top = 566, Width = 120, Height = 56, Text = "Repair" };
-    protected readonly Button SaveButton = new() { Left = 596, Top = 566, Width = 164, Height = 56, Text = "Save Settings" };
+    private readonly Panel _actionPanel = new() { Left = 410, Top = 290, Width = 540, Height = 290 };
+    private readonly Label _title = new() { Left = 28, Top = 16, Width = 470, Height = 40, Text = "LASTCHAOS", ForeColor = Color.White, Font = new Font("Segoe UI Black", 24f, FontStyle.Bold) };
+    private readonly Label _subtitle = new() { Left = 30, Top = 60, Width = 470, Height = 24, Text = "Modern launcher / legacy-compatible", ForeColor = Color.FromArgb(190, 220, 255), Font = new Font("Segoe UI", 10f, FontStyle.Regular) };
 
-    protected readonly GroupBox NewsBox = new() { Left = 20, Top = 20, Width = 350, Height = 425, Text = "News" };
-    protected readonly ListBox NewsList = new() { Left = 10, Top = 24, Width = 330, Height = 390 };
+    protected readonly Label StatusLabel = new() { Left = 30, Top = 96, Width = 490, Height = 34, ForeColor = Color.White, Font = new Font("Segoe UI", 10.5f, FontStyle.Bold) };
+    private readonly Label _gameProgressLabel = new() { Left = 30, Top = 132, Width = 220, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 176, Width = 220, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+
+    protected readonly ProgressBar GameProgress = new() { Left = 30, Top = 152, Width = 488, Height = 14, Style = ProgressBarStyle.Continuous };
+    protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 196, Width = 488, Height = 14, Style = ProgressBarStyle.Continuous };
+
+    protected readonly Button PrimaryButton = new() { Left = 30, Top = 224, Width = 250, Height = 46, Text = "Download / Update", Font = new Font("Segoe UI", 12f, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
+    protected readonly Button PauseButton = new() { Left = 292, Top = 224, Width = 70, Height = 46, Text = "Pause", FlatStyle = FlatStyle.Flat };
+    protected readonly Button RepairButton = new() { Left = 372, Top = 224, Width = 70, Height = 46, Text = "Repair", FlatStyle = FlatStyle.Flat };
+    protected readonly Button SaveButton = new() { Left = 452, Top = 224, Width = 66, Height = 46, Text = "Save", FlatStyle = FlatStyle.Flat };
 
     private CancellationTokenSource? _cts;
     private bool _isUpdating;
@@ -43,11 +50,12 @@ public abstract class LauncherFormBase : Form
         IShortcutService shortcutService)
     {
         Text = title;
-        Width = 800;
-        Height = 700;
+        Width = 1000;
+        Height = 650;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         DoubleBuffered = true;
+        Font = new Font("Segoe UI", 10f);
 
         Settings = settings;
         UpdateService = updateService;
@@ -57,19 +65,24 @@ public abstract class LauncherFormBase : Form
         GameLauncher = gameLauncher;
         ShortcutService = shortcutService;
 
-        NewsBox.Controls.Add(NewsList);
-        Controls.AddRange([
-            NewsBox,
+        ConfigureTheme();
+
+        _newsPanel.Controls.AddRange([_newsTitle, _newsBox]);
+        _actionPanel.Controls.AddRange([
+            _title,
+            _subtitle,
             StatusLabel,
-            GameProgressLabel,
+            _gameProgressLabel,
             GameProgress,
-            AssetsProgressLabel,
+            _assetsProgressLabel,
             AssetsProgress,
             PrimaryButton,
             PauseButton,
             RepairButton,
             SaveButton
         ]);
+
+        Controls.AddRange([_newsPanel, _actionPanel]);
 
         PrimaryButton.Click += async (_, _) => await OnPrimaryActionAsync();
         PauseButton.Click += (_, _) => TogglePause();
@@ -78,14 +91,6 @@ public abstract class LauncherFormBase : Form
 
         Load += (_, _) => OnLauncherLoaded();
         Shown += (_, _) => _ = StartUpdateAsync();
-    }
-
-    private void OnLauncherLoaded()
-    {
-        ApplySkinBackground();
-        LoadNews();
-        UpdatePrimaryButtonLabel();
-        StatusLabel.Text = "Launcher ready. Checking updates in background...";
     }
 
     protected abstract string StyleHtml();
@@ -112,6 +117,58 @@ public abstract class LauncherFormBase : Form
         }
 
         StatusLabel.Text = $"{snapshot.State}: {status} ({pct}%)";
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        base.OnPaintBackground(e);
+
+        var rect = ClientRectangle;
+        using var brush = new LinearGradientBrush(rect, Color.FromArgb(16, 24, 44), Color.FromArgb(32, 39, 63), LinearGradientMode.ForwardDiagonal);
+        e.Graphics.FillRectangle(brush, rect);
+
+        using var glow1 = new SolidBrush(Color.FromArgb(50, 0, 160, 255));
+        using var glow2 = new SolidBrush(Color.FromArgb(35, 120, 40, 255));
+        e.Graphics.FillEllipse(glow1, Width - 360, -120, 420, 420);
+        e.Graphics.FillEllipse(glow2, Width - 420, 260, 360, 360);
+    }
+
+    private void ConfigureTheme()
+    {
+        _newsPanel.BackColor = Color.FromArgb(145, 6, 10, 20);
+        _actionPanel.BackColor = Color.FromArgb(155, 6, 10, 20);
+
+        _newsBox.BackColor = Color.FromArgb(0, 0, 0, 0);
+        _newsBox.ForeColor = Color.FromArgb(224, 234, 255);
+        _newsBox.Font = new Font("Segoe UI", 10f);
+
+        StyleButton(PrimaryButton, Color.FromArgb(50, 156, 255), Color.White);
+        StyleButton(PauseButton, Color.FromArgb(47, 59, 86), Color.White);
+        StyleButton(RepairButton, Color.FromArgb(47, 59, 86), Color.White);
+        StyleButton(SaveButton, Color.FromArgb(47, 59, 86), Color.White);
+
+        GameProgress.ForeColor = Color.FromArgb(77, 181, 255);
+        AssetsProgress.ForeColor = Color.FromArgb(116, 219, 144);
+    }
+
+    private static void StyleButton(Button button, Color background, Color foreground)
+    {
+        button.BackColor = background;
+        button.ForeColor = foreground;
+        button.FlatAppearance.BorderColor = Color.FromArgb(95, 115, 158);
+        button.FlatAppearance.BorderSize = 1;
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(
+            Math.Min(background.R + 15, 255),
+            Math.Min(background.G + 15, 255),
+            Math.Min(background.B + 15, 255));
+    }
+
+    private void OnLauncherLoaded()
+    {
+        ApplySkinBackground();
+        LoadNews();
+        UpdatePrimaryButtonLabel();
+        StatusLabel.Text = "Launcher ready. Checking updates in background...";
     }
 
     private async Task OnPrimaryActionAsync()
@@ -221,35 +278,36 @@ public abstract class LauncherFormBase : Form
         };
 
         var path = candidates.FirstOrDefault(File.Exists);
-        if (!string.IsNullOrWhiteSpace(path))
+        if (string.IsNullOrWhiteSpace(path))
         {
-            try
-            {
-                BackgroundImage = Image.FromFile(path);
-                BackgroundImageLayout = ImageLayout.Stretch;
-            }
-            catch
-            {
-                BackColor = Color.FromArgb(36, 42, 56);
-            }
+            return;
         }
-        else
+
+        try
         {
-            BackColor = Color.FromArgb(36, 42, 56);
+            var original = Image.FromFile(path);
+            var tinted = new Bitmap(original.Width, original.Height);
+            using var g = Graphics.FromImage(tinted);
+            g.DrawImage(original, 0, 0, original.Width, original.Height);
+            using var darken = new SolidBrush(Color.FromArgb(95, 8, 14, 28));
+            g.FillRectangle(darken, 0, 0, tinted.Width, tinted.Height);
+            BackgroundImage = tinted;
+            BackgroundImageLayout = ImageLayout.Stretch;
+        }
+        catch
+        {
+            // Use gradient fallback.
         }
     }
 
     private void LoadNews()
     {
-        NewsList.Items.Clear();
-        NewsList.Items.Add("Loading news...");
-
+        _newsBox.Clear();
         var newsPath = Path.Combine(AppContext.BaseDirectory, "news.json");
         if (!File.Exists(newsPath))
         {
-            NewsList.Items.Clear();
-            NewsList.Items.Add("No news yet.");
-            NewsList.Items.Add("Create news.json to populate this section.");
+            _newsBox.AppendText("No news yet.\n\n");
+            _newsBox.AppendText("Create news.json to populate this section.");
             return;
         }
 
@@ -257,26 +315,23 @@ public abstract class LauncherFormBase : Form
         {
             var json = File.ReadAllText(newsPath);
             var items = JsonSerializer.Deserialize<List<NewsItem>>(json) ?? [];
-            NewsList.Items.Clear();
-
             if (items.Count == 0)
             {
-                NewsList.Items.Add("No news entries.");
+                _newsBox.AppendText("No news entries.");
                 return;
             }
 
             foreach (var item in items)
             {
-                NewsList.Items.Add($"[{item.Date}] {item.Title}");
-                NewsList.Items.Add(item.Body);
-                NewsList.Items.Add(string.Empty);
+                _newsBox.SelectionFont = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
+                _newsBox.AppendText($"[{item.Date}] {item.Title}\n");
+                _newsBox.SelectionFont = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+                _newsBox.AppendText(item.Body + "\n\n");
             }
         }
         catch (Exception ex)
         {
-            NewsList.Items.Clear();
-            NewsList.Items.Add("Failed to load news.json");
-            NewsList.Items.Add(ex.Message);
+            _newsBox.AppendText("Failed to load news.json\n\n" + ex.Message);
         }
     }
 
