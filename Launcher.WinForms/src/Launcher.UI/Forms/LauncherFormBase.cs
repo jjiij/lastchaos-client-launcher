@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Launcher.Core.Contracts;
 using Launcher.Core.Enums;
 using Launcher.Core.Models;
@@ -14,18 +15,22 @@ public abstract class LauncherFormBase : Form
     protected readonly IGameLauncher GameLauncher;
     protected readonly IShortcutService ShortcutService;
 
-    protected readonly Label StatusLabel = new() { AutoSize = false, Width = 760, Height = 40, Top = 520, Left = 16 };
-    protected readonly ProgressBar Progress = new() { Left = 16, Top = 560, Width = 760, Height = 20 };
-    protected readonly Button StartButton = new() { Left = 16, Top = 590, Width = 140, Height = 30, Text = "Start Update" };
-    protected readonly Button PauseButton = new() { Left = 166, Top = 590, Width = 140, Height = 30, Text = "Pause" };
-    protected readonly Button RepairButton = new() { Left = 316, Top = 590, Width = 140, Height = 30, Text = "Repair" };
-    protected readonly Button LaunchButton = new() { Left = 466, Top = 590, Width = 140, Height = 30, Text = "Launch" };
-    protected readonly Button SaveButton = new() { Left = 616, Top = 590, Width = 140, Height = 30, Text = "Save Settings" };
-    protected readonly Panel WebPanel = new() { Left = 16, Top = 48, Width = 740, Height = 360, BorderStyle = BorderStyle.FixedSingle };
-    protected readonly Label WebPlaceholder = new() { Left = 24, Top = 56, Width = 724, Height = 28, Text = "Embedded web panel disabled in this build. Open style page in your browser:", AutoSize = false };
-    protected readonly LinkLabel WebLink = new() { Left = 24, Top = 84, Width = 724, Height = 24, AutoSize = false };
+    protected readonly Label StatusLabel = new() { AutoSize = false, Width = 740, Height = 40, Top = 460, Left = 20, ForeColor = Color.White, BackColor = Color.FromArgb(150, 0, 0, 0) };
+    protected readonly ProgressBar GameProgress = new() { Left = 20, Top = 510, Width = 740, Height = 18 };
+    protected readonly ProgressBar AssetsProgress = new() { Left = 20, Top = 536, Width = 740, Height = 18 };
+    protected readonly Label GameProgressLabel = new() { Left = 20, Top = 492, Width = 200, Height = 16, Text = "Game Download", ForeColor = Color.White, BackColor = Color.Transparent };
+    protected readonly Label AssetsProgressLabel = new() { Left = 20, Top = 518, Width = 200, Height = 16, Text = "Assets Download", ForeColor = Color.White, BackColor = Color.Transparent };
+
+    protected readonly Button PrimaryButton = new() { Left = 20, Top = 566, Width = 300, Height = 56, Text = "Download / Update", Font = new Font("Segoe UI", 13, FontStyle.Bold) };
+    protected readonly Button PauseButton = new() { Left = 332, Top = 566, Width = 120, Height = 56, Text = "Pause" };
+    protected readonly Button RepairButton = new() { Left = 464, Top = 566, Width = 120, Height = 56, Text = "Repair" };
+    protected readonly Button SaveButton = new() { Left = 596, Top = 566, Width = 164, Height = 56, Text = "Save Settings" };
+
+    protected readonly GroupBox NewsBox = new() { Left = 20, Top = 20, Width = 350, Height = 425, Text = "News" };
+    protected readonly ListBox NewsList = new() { Left = 10, Top = 24, Width = 330, Height = 390 };
 
     private CancellationTokenSource? _cts;
+    private bool _isUpdating;
 
     protected LauncherFormBase(
         string title,
@@ -40,6 +45,9 @@ public abstract class LauncherFormBase : Form
         Text = title;
         Width = 800;
         Height = 700;
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        MaximizeBox = false;
+        DoubleBuffered = true;
 
         Settings = settings;
         UpdateService = updateService;
@@ -49,14 +57,24 @@ public abstract class LauncherFormBase : Form
         GameLauncher = gameLauncher;
         ShortcutService = shortcutService;
 
-        Controls.AddRange([WebPanel, WebPlaceholder, WebLink, StatusLabel, Progress, StartButton, PauseButton, RepairButton, LaunchButton, SaveButton]);
+        NewsBox.Controls.Add(NewsList);
+        Controls.AddRange([
+            NewsBox,
+            StatusLabel,
+            GameProgressLabel,
+            GameProgress,
+            AssetsProgressLabel,
+            AssetsProgress,
+            PrimaryButton,
+            PauseButton,
+            RepairButton,
+            SaveButton
+        ]);
 
-        StartButton.Click += async (_, _) => await StartUpdateAsync();
+        PrimaryButton.Click += async (_, _) => await OnPrimaryActionAsync();
         PauseButton.Click += (_, _) => TogglePause();
         RepairButton.Click += async (_, _) => await RunRepairAsync();
-        LaunchButton.Click += async (_, _) => await LaunchGameAsync();
         SaveButton.Click += async (_, _) => await SaveSettingsAsync();
-        WebLink.LinkClicked += OnWebLinkClicked;
 
         Load += (_, _) => OnLauncherLoaded();
         Shown += (_, _) => _ = StartUpdateAsync();
@@ -64,8 +82,9 @@ public abstract class LauncherFormBase : Form
 
     private void OnLauncherLoaded()
     {
-        var stylePage = BuildSafeStyleUrl();
-        WebLink.Text = stylePage;
+        ApplySkinBackground();
+        LoadNews();
+        UpdatePrimaryButtonLabel();
         StatusLabel.Text = "Launcher ready. Checking updates in background...";
     }
 
@@ -79,19 +98,63 @@ public abstract class LauncherFormBase : Form
             return;
         }
 
-        Progress.Value = Math.Clamp(snapshot.Percent, 0, 100);
-        StatusLabel.Text = $"{snapshot.State}: {snapshot.StatusText} ({snapshot.Percent}%)";
+        var pct = Math.Clamp(snapshot.Percent, 0, 100);
+        var status = snapshot.StatusText ?? string.Empty;
+
+        if (status.Contains("assets", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("assets-main.zip", StringComparison.OrdinalIgnoreCase))
+        {
+            AssetsProgress.Value = pct;
+        }
+        else
+        {
+            GameProgress.Value = pct;
+        }
+
+        StatusLabel.Text = $"{snapshot.State}: {status} ({pct}%)";
+    }
+
+    private async Task OnPrimaryActionAsync()
+    {
+        if (_isUpdating)
+        {
+            return;
+        }
+
+        if (HasLaunchableGame())
+        {
+            await LaunchGameAsync();
+            return;
+        }
+
+        await StartUpdateAsync();
     }
 
     private async Task StartUpdateAsync()
     {
+        if (_isUpdating)
+        {
+            return;
+        }
+
+        _isUpdating = true;
+        PrimaryButton.Enabled = false;
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
+
         StatusLabel.Text = "Checking updates...";
-        var result = await Task.Run(
-            async () => await UpdateService.UpdateGameAndAssetsAsync(_cts.Token),
-            _cts.Token);
+        var result = await Task.Run(async () => await UpdateService.UpdateGameAndAssetsAsync(_cts.Token), _cts.Token);
+
+        _isUpdating = false;
+        PrimaryButton.Enabled = true;
         StatusLabel.Text = result.Success ? $"Completed: {result.Message}" : $"Error: {result.Message}";
+
+        if (result.Success)
+        {
+            GameProgress.Value = 100;
+            AssetsProgress.Value = 100;
+            UpdatePrimaryButtonLabel();
+        }
 
         if (result.Success && Settings.StartGameAfterUpdate)
         {
@@ -105,11 +168,13 @@ public abstract class LauncherFormBase : Form
         {
             UpdateService.Resume();
             PauseButton.Text = "Pause";
+            StatusLabel.Text = "Resumed";
         }
         else
         {
             UpdateService.Pause();
             PauseButton.Text = "Resume";
+            StatusLabel.Text = "Paused";
         }
     }
 
@@ -134,55 +199,91 @@ public abstract class LauncherFormBase : Form
         StatusLabel.Text = "Settings saved";
     }
 
-    private void OnWebLinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
+    private bool HasLaunchableGame()
     {
-        var url = WebLink.Text ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return;
-        }
-
-        if (url.Contains("#discord_join=", StringComparison.OrdinalIgnoreCase))
-        {
-            var invite = url[(url.IndexOf("#discord_join=", StringComparison.OrdinalIgnoreCase) + "#discord_join=".Length)..];
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo($"discord:///invite/{invite}") { UseShellExecute = true });
-            return;
-        }
-
-        if (url.Contains("#open=", StringComparison.OrdinalIgnoreCase))
-        {
-            var open = url[(url.IndexOf("#open=", StringComparison.OrdinalIgnoreCase) + "#open=".Length)..];
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(open) { UseShellExecute = true });
-            return;
-        }
-
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        var nksp = Path.Combine(AppContext.BaseDirectory, "Bin", "Nksp.exe");
+        return File.Exists(nksp);
     }
 
-    private string BuildSafeStyleUrl()
+    private void UpdatePrimaryButtonLabel()
     {
-        var host = (Settings.HostUrl ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(host))
+        PrimaryButton.Text = HasLaunchableGame() ? "Launch Game" : "Download / Update";
+    }
+
+    private void ApplySkinBackground()
+    {
+        var candidates = new[]
         {
-            return "about:blank";
+            Path.Combine(AppContext.BaseDirectory, "CD_Root", "AutoPlay", "Images", "style4", "background.png"),
+            Path.Combine(AppContext.BaseDirectory, "CD_Root", "AutoPlay", "Images", "Style3", "background.bmp"),
+            Path.Combine(AppContext.BaseDirectory, "CD_Root", "AutoPlay", "Images", "Style2", "background.bmp"),
+            Path.Combine(AppContext.BaseDirectory, "CD_Root", "AutoPlay", "Images", "Style1", "background.bmp")
+        };
+
+        var path = candidates.FirstOrDefault(File.Exists);
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            try
+            {
+                BackgroundImage = Image.FromFile(path);
+                BackgroundImageLayout = ImageLayout.Stretch;
+            }
+            catch
+            {
+                BackColor = Color.FromArgb(36, 42, 56);
+            }
+        }
+        else
+        {
+            BackColor = Color.FromArgb(36, 42, 56);
+        }
+    }
+
+    private void LoadNews()
+    {
+        NewsList.Items.Clear();
+        NewsList.Items.Add("Loading news...");
+
+        var newsPath = Path.Combine(AppContext.BaseDirectory, "news.json");
+        if (!File.Exists(newsPath))
+        {
+            NewsList.Items.Clear();
+            NewsList.Items.Add("No news yet.");
+            NewsList.Items.Add("Create news.json to populate this section.");
+            return;
         }
 
-        if (!host.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-            !host.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            host = "https://" + host;
-        }
+            var json = File.ReadAllText(newsPath);
+            var items = JsonSerializer.Deserialize<List<NewsItem>>(json) ?? [];
+            NewsList.Items.Clear();
 
-        if (!host.EndsWith("/"))
+            if (items.Count == 0)
+            {
+                NewsList.Items.Add("No news entries.");
+                return;
+            }
+
+            foreach (var item in items)
+            {
+                NewsList.Items.Add($"[{item.Date}] {item.Title}");
+                NewsList.Items.Add(item.Body);
+                NewsList.Items.Add(string.Empty);
+            }
+        }
+        catch (Exception ex)
         {
-            host += "/";
+            NewsList.Items.Clear();
+            NewsList.Items.Add("Failed to load news.json");
+            NewsList.Items.Add(ex.Message);
         }
+    }
 
-        if (!Uri.TryCreate(host, UriKind.Absolute, out var baseUri))
-        {
-            return "about:blank";
-        }
-
-        return new Uri(baseUri, StyleHtml()).ToString();
+    private sealed class NewsItem
+    {
+        public string Date { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Body { get; set; } = "";
     }
 }
