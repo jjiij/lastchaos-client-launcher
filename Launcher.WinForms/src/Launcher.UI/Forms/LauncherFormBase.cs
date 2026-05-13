@@ -16,25 +16,26 @@ public abstract class LauncherFormBase : Form
     protected readonly IGameLauncher GameLauncher;
     protected readonly IShortcutService ShortcutService;
 
-    private readonly Panel _newsPanel = new() { Left = 24, Top = 24, Width = 360, Height = 500 };
+    private readonly Panel _newsPanel = new() { Left = 24, Top = 24, Width = 360, Height = 500, Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left };
     private readonly Label _newsTitle = new() { Left = 18, Top = 16, Width = 320, Height = 30, Text = "NEWS", ForeColor = Color.White, Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold) };
     private readonly RichTextBox _newsBox = new() { Left = 18, Top = 56, Width = 324, Height = 420, ReadOnly = true, BorderStyle = BorderStyle.None };
 
-    private readonly Panel _actionPanel = new() { Left = 410, Top = 290, Width = 540, Height = 290 };
-    private readonly Label _title = new() { Left = 28, Top = 16, Width = 470, Height = 40, Text = "LASTCHAOS", ForeColor = Color.White, Font = new Font("Segoe UI Black", 24f, FontStyle.Bold) };
+    private readonly Panel _actionPanel = new() { Left = 410, Top = 260, Width = 540, Height = 320, Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
+    private readonly Label _title = new() { Left = 28, Top = 16, Width = 490, Height = 52, Text = "LASTCHAOS", ForeColor = Color.White, Font = new Font("Segoe UI Black", 20f, FontStyle.Bold) };
     private readonly Label _subtitle = new() { Left = 30, Top = 60, Width = 470, Height = 24, Text = "Modern launcher / legacy-compatible", ForeColor = Color.FromArgb(190, 220, 255), Font = new Font("Segoe UI", 10f, FontStyle.Regular) };
 
     protected readonly Label StatusLabel = new() { Left = 30, Top = 96, Width = 490, Height = 34, ForeColor = Color.White, BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 10.5f, FontStyle.Bold) };
-    private readonly Label _gameProgressLabel = new() { Left = 30, Top = 132, Width = 220, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
-    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 176, Width = 220, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+    private readonly Label _downloadDetailsLabel = new() { Left = 30, Top = 126, Width = 490, Height = 22, ForeColor = Color.FromArgb(197, 206, 231), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Regular), Text = "No active download." };
+    private readonly Label _gameProgressLabel = new() { Left = 30, Top = 154, Width = 220, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 198, Width = 220, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
 
-    protected readonly ProgressBar GameProgress = new() { Left = 30, Top = 152, Width = 488, Height = 14, Style = ProgressBarStyle.Continuous };
-    protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 196, Width = 488, Height = 14, Style = ProgressBarStyle.Continuous };
+    protected readonly ProgressBar GameProgress = new() { Left = 30, Top = 174, Width = 488, Height = 14, Style = ProgressBarStyle.Continuous };
+    protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 218, Width = 488, Height = 14, Style = ProgressBarStyle.Continuous };
 
-    protected readonly Button PrimaryButton = new() { Left = 30, Top = 224, Width = 250, Height = 46, Text = "Download / Update", Font = new Font("Segoe UI", 12f, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
-    protected readonly Button PauseButton = new() { Left = 292, Top = 224, Width = 70, Height = 46, Text = "Pause", FlatStyle = FlatStyle.Flat };
-    protected readonly Button RepairButton = new() { Left = 372, Top = 224, Width = 70, Height = 46, Text = "Repair", FlatStyle = FlatStyle.Flat };
-    protected readonly Button SaveButton = new() { Left = 452, Top = 224, Width = 66, Height = 46, Text = "Save", FlatStyle = FlatStyle.Flat };
+    protected readonly Button PrimaryButton = new() { Left = 30, Top = 250, Width = 250, Height = 52, Text = "Download / Update", Font = new Font("Segoe UI", 12f, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
+    protected readonly Button PauseButton = new() { Left = 292, Top = 250, Width = 70, Height = 52, Text = "Pause", FlatStyle = FlatStyle.Flat };
+    protected readonly Button RepairButton = new() { Left = 372, Top = 250, Width = 70, Height = 52, Text = "Repair", FlatStyle = FlatStyle.Flat };
+    protected readonly Button SaveButton = new() { Left = 452, Top = 250, Width = 66, Height = 52, Text = "Save", FlatStyle = FlatStyle.Flat };
 
     private CancellationTokenSource? _cts;
     private bool _isUpdating;
@@ -52,6 +53,7 @@ public abstract class LauncherFormBase : Form
         Text = title;
         Width = 1000;
         Height = 650;
+        AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         DoubleBuffered = true;
@@ -72,6 +74,7 @@ public abstract class LauncherFormBase : Form
             _title,
             _subtitle,
             StatusLabel,
+            _downloadDetailsLabel,
             _gameProgressLabel,
             GameProgress,
             _assetsProgressLabel,
@@ -90,7 +93,6 @@ public abstract class LauncherFormBase : Form
         SaveButton.Click += async (_, _) => await SaveSettingsAsync();
 
         Load += (_, _) => OnLauncherLoaded();
-        Shown += (_, _) => _ = StartUpdateAsync();
     }
 
     protected abstract string StyleHtml();
@@ -105,6 +107,7 @@ public abstract class LauncherFormBase : Form
 
         var pct = Math.Clamp(snapshot.Percent, 0, 100);
         var status = snapshot.StatusText ?? string.Empty;
+        _downloadDetailsLabel.Text = BuildDownloadDetails(snapshot);
 
         if (status.Contains("assets", StringComparison.OrdinalIgnoreCase) ||
             status.Contains("assets-main.zip", StringComparison.OrdinalIgnoreCase))
@@ -196,6 +199,7 @@ public abstract class LauncherFormBase : Form
 
         _isUpdating = true;
         PrimaryButton.Enabled = false;
+        PrimaryButton.Text = "Updating...";
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
 
@@ -205,6 +209,7 @@ public abstract class LauncherFormBase : Form
         _isUpdating = false;
         PrimaryButton.Enabled = true;
         StatusLabel.Text = result.Success ? $"Completed: {result.Message}" : $"Error: {result.Message}";
+        _downloadDetailsLabel.Text = result.Success ? "Update finished." : "Update failed.";
 
         if (result.Success)
         {
@@ -226,12 +231,14 @@ public abstract class LauncherFormBase : Form
             UpdateService.Resume();
             PauseButton.Text = "Pause";
             StatusLabel.Text = "Resumed";
+            _downloadDetailsLabel.Text = "Download resumed.";
         }
         else
         {
             UpdateService.Pause();
             PauseButton.Text = "Resume";
             StatusLabel.Text = "Paused";
+            _downloadDetailsLabel.Text = "Download paused.";
         }
     }
 
@@ -333,6 +340,35 @@ public abstract class LauncherFormBase : Form
         {
             _newsBox.AppendText("Failed to load news.json\n\n" + ex.Message);
         }
+    }
+
+    private static string BuildDownloadDetails(ProgressSnapshot snapshot)
+    {
+        if (snapshot.BytesTotal <= 0)
+        {
+            return snapshot.StatusText;
+        }
+
+        var transferred = FormatBytes(snapshot.BytesTransferred);
+        var total = FormatBytes(snapshot.BytesTotal);
+        var speed = snapshot.SpeedBytesPerSecond > 0
+            ? $"{FormatBytes((long)snapshot.SpeedBytesPerSecond)}/s"
+            : "0 B/s";
+        return $"{snapshot.StatusText} | {transferred} / {total} | {speed}";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double value = bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+
+        return $"{value:0.##} {units[unit]}";
     }
 
     private sealed class NewsItem
