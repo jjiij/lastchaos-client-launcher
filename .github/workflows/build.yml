@@ -1,0 +1,49 @@
+name: Build and Release WinForms Launcher
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore Launcher.WinForms/Launcher.WinForms.sln
+
+      - name: Build
+        run: dotnet build Launcher.WinForms/Launcher.WinForms.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test Launcher.WinForms/Launcher.WinForms.sln --configuration Release --no-build --verbosity normal
+
+      - name: Publish WinForms app
+        run: dotnet publish Launcher.WinForms/src/Launcher.UI/Launcher.UI.csproj -c Release -r win-x64 --self-contained false -o out/launcher
+
+      - name: Package launcher
+        shell: powershell
+        run: Compress-Archive -Path "out/launcher/*" -DestinationPath "lastchaos-launcher-windows-x64.zip" -Force
+
+      - name: Upload release artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          files: lastchaos-launcher-windows-x64.zip
+          tag_name: latest
+          name: Latest Build
+          body: "LastChaos WinForms launcher build"
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,8228 @@
+<?xml version="1.0" encoding="iso-8859-1"?><DocumentData>
+<ProductVersion>8.5.3.0</ProductVersion>
+<ProductID>{ABF9EF9E-ECF6-4019-8A3E-908A6CFF4D1A}</ProductID>
+<IRProductName>AutoPlay Media Studio 8</IRProductName>
+<ProductType>Commercial</ProductType>
+<DocInfo>
+<Title/>
+<Author/>
+<Company/>
+<Copyright>Copyright © 2021</Copyright>
+<URL/>
+<Email/>
+<Comments/>
+<CreatedVersion>8.5.3.0 (Professional Edition Commercial)</CreatedVersion>
+<LastSavedVersion>8.5.3.0 (Professional Edition Commercial)</LastSavedVersion>
+</DocInfo>
+<ProjectInfo ToolTipStyle="0">
+<Office2007Theme Theme="5"/>
+<WindowStyles>
+<Width>750</Width>
+<Height>550</Height>
+<WindowTitle>LastChaos Launcher</WindowTitle>
+<WindowStyle>2</WindowStyle>
+<FillColor>0</FillColor>
+</WindowStyles>
+<WindowOptions>
+<Movable>1</Movable>
+<AlwaysOnTop>0</AlwaysOnTop>
+<Resizable>0</Resizable>
+<MinWidth>100</MinWidth>
+<MinHeight>429</MinHeight>
+</WindowOptions>
+<TransparentWindow>
+<TransparentImage/>
+<FitTrans>1</FitTrans>
+</TransparentWindow>
+<Icon>
+<UseCustomIcon>1</UseCustomIcon>
+<TaskbarVisibility>0</TaskbarVisibility>
+<IconFile>AutoPlay\Icons\32x32.ico</IconFile>
+</Icon>
+<IntroVideo>
+<AllowClickToSkip>1</AllowClickToSkip>
+<MediaWidth>630</MediaWidth>
+<MediaHeight>425</MediaHeight>
+<WindowWidth>630</WindowWidth>
+<WindowHeight>425</WindowHeight>
+<BackgroundColor>16777215</BackgroundColor>
+<MediaMode>1</MediaMode>
+<WindowMode>0</WindowMode>
+<VideoFileName/>
+<UseIntroVideo>0</UseIntroVideo>
+<VideoType>0</VideoType>
+<UseBorder>0</UseBorder>
+<TitleBar>0</TitleBar>
+<TitleBarText/>
+</IntroVideo>
+<AudioBGMusic>
+<ShuffleMode>0</ShuffleMode>
+<Repeat>1</Repeat>
+<BackVolume>255</BackVolume>
+<EffectsVolume>255</EffectsVolume>
+<Tracks/>
+</AudioBGMusic>
+<Globals>
+<Script>require("launcher");
+http = require("socket.http");
+http.TIMEOUT = (3);
+
+LocalVersion	= tonumber(ReadBRN(_SourceFolder.."\\vtm.brn"));
+LauncherData	= ReadDTA(_SourceFolder.."\\lccnct.dta");--Table Value 1 = Launcher Url, Value 2 = Nksp launch argument, Value 3 = Enable (false/true) Multi Nksp, Value 4 = Server name, Value 5 = Launcher Style, Value 6 = (true/false) Allow Or Not Repair Function
+OnlineVersion   = (0);
+DownloadSession = (nil);
+PatchFilePath	= ("");
+Cancel			= (false);
+PatchSize		= (0);
+UnzipPercent	= (0);
+Tools			= (false);
+
+function Settings()
+	tblMenu = ({});
+	tblMenu[1] = ({});
+	tblMenu[1].Text = ("&amp;Run on Startup");
+	tblMenu[1].ID = (1);
+	if(Application.LoadValue("LastChaos "..ServerName.." Launcher", "RunOnStartup") == "true")then
+		tblMenu[1].Checked = (true);
+	else
+		tblMenu[1].Checked = (false);
+	end
+
+	tblMenu[2] = ({});
+	tblMenu[2].Text = ("&amp;Start Game after update complete");
+	tblMenu[2].ID = (2);
+	if(Application.LoadValue("LastChaos "..ServerName.." Launcher", "StartGameAfterUpdate") == "true")then
+		tblMenu[2].Checked = (true);
+	else
+		tblMenu[2].Checked = (false);
+	end
+	
+	tblMenu[3] = ({});
+	tblMenu[3].Text = ("Game Resolution");
+	tblMenu[3].SubMenu = ({});
+	
+	if(File.DoesExist(_SourceFolder.."\\Data\\Etc\\Setting.ini"))then
+		local GetRes = ("");
+		if(File.DoesExist(_SourceFolder.."\\Data\\Etc\\DisplaySize.txt"))then
+			GetRes = TextFile.ReadToString(_SourceFolder.."\\Data\\Etc\\DisplaySize.txt");	
+		end
+		
+		for _, sName in pairs(INIFile.GetSectionNames(_SourceFolder.."\\Data\\Etc\\Setting.ini")) do
+			if(String.Left(sName, 4) == "GAP_")then
+				local Display = System.GetDisplayInfo();
+				local Sizes = ({});
+				
+				for Size in string.gmatch(String.Replace(String.Replace(sName, "GAP_", "", true), "_", " ", true), "[^%s]+") do
+					table.insert(Sizes, Size);
+				end
+				
+				if(Display.Width &gt; tonumber(Sizes[1]) or Display.Height &gt; tonumber(Sizes[2]))then
+					tblMenu[3].SubMenu[_] = ({});
+					tblMenu[3].SubMenu[_].Text = (String.Replace(String.Replace(sName, "GAP_", "", true), "_", " x ", true));
+					tblMenu[3].SubMenu[_].ID = (_+4);
+					if(GetRes == String.Replace(String.Replace(sName, "GAP_", "", true), "_", " ", true))then
+						tblMenu[3].SubMenu[_].Checked = (true);
+					else
+						tblMenu[3].SubMenu[_].Checked = (false);
+					end
+				end
+			end
+		end
+	end
+	
+	tblMenu[4] = ({});
+	tblMenu[4].Text = ("---");
+	
+	tblMenu[5] = ({});
+	tblMenu[5].Text = ("&amp;Install Dependencies");
+	tblMenu[5].ID = (3);
+	tblMenu[5].Enabled = (Tools);
+	
+	if(AllowRepairFunction == "true")then
+		tblMenu[6] = ({});
+		tblMenu[6].Text = ("&amp;Verify Integrity of Game Files");
+		tblMenu[6].ID = (4);
+		tblMenu[6].Enabled = (Tools);
+	end
+	
+	local Pos = System.GetMousePosition(true, Application.GetWndHandle());
+	local Ret = Application.ShowPopupMenu(Pos.X, Pos.Y, tblMenu, TPM_CENTERALIGN, TPM_BOTTOMALIGN, true, true);
+	
+	if(Ret ~= 0)then
+		if(Ret == 1 or Ret == 2)then
+			if(tblMenu[Ret].Checked == false)then
+				tblMenu[Ret].Checked = (true);
+				
+				if(tblMenu[Ret].ID == 1)then
+					Application.SaveValue("LastChaos "..ServerName.." Launcher", "RunOnStartup", "true");
+					
+					Shell.CreateShortcut(Shell.GetFolder(SHF_STARTUP), "LastChaos "..ServerName.." Launcher", _SourceFolder.."\\".._SourceFilename, "", "", "", 0, SW_SHOWNORMAL, nil, "Launcher", START_OPTION_NO_PIN);
+				elseif(tblMenu[Ret].ID == 2)then
+					Application.SaveValue("LastChaos "..ServerName.." Launcher", "StartGameAfterUpdate", "true");
+				end
+			elseif(tblMenu[Ret].Checked == true)then
+				tblMenu[Ret].Checked = (false);
+				
+				if(tblMenu[Ret].ID == 1)then
+					Application.SaveValue("LastChaos "..ServerName.." Launcher", "RunOnStartup", "false");
+					
+					Shell.DeleteShortcut(Shell.GetFolder(SHF_STARTUP), "LastChaos "..ServerName.." Launcher");
+				elseif(tblMenu[Ret].ID == 2)then
+					Application.SaveValue("LastChaos "..ServerName.." Launcher", "StartGameAfterUpdate", "false");
+				end
+			end
+		end
+		
+		if(Ret == 3)then
+			local PWFR = Shell.Execute(_SourceFolder.."\\Launcher\\Docs\\vcredist_2010_x86.exe", "open", "/q", "", SW_SHOWNORMAL, true);
+			if(PWFR)then
+				Dialog.Message("Dependency", "VCRedist C++ 2010 Was installed!", MB_OK, MB_ICONINFORMATION, MB_DEFBUTTON1);
+			end
+			
+			local PWFR = Shell.Execute(_SourceFolder.."\\Launcher\\Docs\\dxwebsetup.exe", "open", "/q", "", SW_SHOWNORMAL, true);
+			if(PWFR)then
+				Dialog.Message("Dependency", "DirectX 9.0c Was installed!", MB_OK, MB_ICONINFORMATION, MB_DEFBUTTON1);
+			end
+		end
+		
+		if(Ret == 4)then
+			StatusDlg.Show(MB_ICONNONE, false);
+			StatusDlg.ShowProgressMeter(true);
+			StatusDlg.SetTitle("Game Files Integrity Verification");
+			
+			StatusDlg.SetMessage("Connecting to server...");
+			if(http.request({url=HostIP.."client/checklist.txt", method="HEAD"}) == 1)then
+				ChangeStatus("Repairing");
+			
+				StatusDlg.SetMessage("Downloading File List...");
+				PatchFilePath = (_SourceFolder.."\\checklist.txt");
+				
+				Download.Start(Application.GetWndHandle(), HostIP.."client/checklist.txt", PatchFilePath, "", "", false, nil, -1, 0, 0);	
+			else
+				ChangeStatus("Error", "Unable to connect to check list file.\r\nCheck your Internet connection or contact an administrator.\r\nCannot continue, update canceled.", false);
+				StatusDlg.Hide();
+			end
+		end
+		
+		if(Ret &gt; 4)then
+			TextFile.WriteFromString(_SourceFolder.."\\Data\\Etc\\DisplaySize.txt", String.Replace(tblMenu[3].SubMenu[Ret-4].Text, " x ", " ", true), false);
+		end
+	end
+end
+
+function ChangeStatus(State, Message, CloseAfterConfirm)--if state = error and closeafterconfirm = false &gt;&gt; retry
+	if(State == "Repairing")then
+		TaskBarList.SetProgressState(TBPF_NORMAL);
+		TaskBarList.SetOverlayIcon(nil);
+		
+		if(Application.GetCurrentPage() == "devscreen")then
+			xButton.SetEnabled("xButton3", false);
+			xButton.SetText("xButton3", "Repairing");
+		else
+			Button.SetText("START", "Repairing");
+			Button.SetEnabled("START", false);
+		end
+	elseif(State == "Completed")then
+		TaskBarList.SetProgressState(TBPF_NOPROGRESS);
+		TaskBarList.SetOverlayIcon(nil);
+		
+		local LCEXENEW = File.Find(_SourceFolder, "LC.exe.new", true, false, nil, nil);
+		local LCCDDNEW = File.Find(_SourceFolder, "LC.cdd.new", true, false, nil, nil);
+		if(LCEXENEW ~= nil and LCCDDNEW ~= nil)then
+			Dialog.Message("Notice", "Launcher needs to restart...", MB_OK, MB_ICONINFORMATION, MB_DEFBUTTON1);
+			
+			TextFile.WriteFromString(_SourceFolder.."\\LauncherUpdater.bat", [[
+				:Repeat
+				del "LC.exe"
+				if exist "LC.exe" goto Repeat
+				move "LC.exe.new" "LC.exe"
+															
+				:Repeat
+				del "LC.cdd"
+				if exist "LC.cdd" goto Repeat
+				move "LC.cdd.new" "LC.cdd"
+																
+				start /NORMAL LC.exe
+				del "LauncherUpdater.bat"
+			]], false);
+								
+			File.Run(_SourceFolder.."\\LauncherUpdater.bat", "", "", SW_SHOWNORMAL, false);
+			Window.Close(Application.GetWndHandle(), CLOSEWND_TERMINATE);
+		end
+		
+		if(Application.GetCurrentPage() == "style1" or Application.GetCurrentPage() == "style2" or Application.GetCurrentPage() == "style4" or Application.GetCurrentPage() == "devscreen")then
+			Paragraph.SetText("Status", "Update Completed!");
+		elseif(Application.GetCurrentPage() == "style3")then
+			Progress.SetText("Progress", "Update Completed!");
+		end
+		
+		if(Application.GetCurrentPage() == "style4")then
+			Image.SetSize("ProgressBar", 446, 15);
+		else
+			Progress.SetCurrentPos("Progress", 100);
+		end
+		
+		if(Application.LoadValue("LastChaos "..ServerName.." Launcher", "StartGameAfterUpdate") == "true")then
+			LaunchGame();
+		end
+		
+		if(Application.GetCurrentPage() == "devscreen")then
+			xButton.SetText("xButton3", "Start Game");
+			xButton.SetEnabled("xButton3", true);
+			
+			LoadInfo();
+		else
+			Button.SetText("START", "Start Game");
+			Button.SetEnabled("START", true);
+		end
+		
+		Tools = (true);
+	elseif(State == "Downloading")then
+		TaskBarList.SetProgressState(TBPF_NORMAL);
+		TaskBarList.SetOverlayIcon(nil);
+		
+		if(Application.GetCurrentPage() == "devscreen")then
+			xButton.SetText("xButton3", "Pause");
+			xButton.SetEnabled("xButton3", true);
+		else
+			Button.SetText("START", "Pause");
+			Button.SetEnabled("START", true);
+		end
+	elseif(State == "Paused")then
+		TaskBarList.SetProgressState(TBPF_PAUSED);
+		TaskBarList.SetOverlayIcon(nil);
+		
+		Download.Stop(DownloadSession);
+		
+		if(Application.GetCurrentPage() == "devscreen")then
+			xButton.SetText("xButton3", "Resume");
+			xButton.SetEnabled("xButton3", true);
+		else
+			Button.SetText("START", "Resume");
+			Button.SetEnabled("START", true);
+		end
+	elseif(State == "Error")then
+		TaskBarList.SetOverlayIcon(IDI_ERROR);
+		TaskBarList.SetProgressState(TBPF_ERROR);
+		
+		if(CloseAfterConfirm == true)then
+			Dialog.Message("FATAL ERROR", Message, MB_OK, MB_ICONSTOP, MB_DEFBUTTON1);
+			Window.Close(Application.GetWndHandle(), CLOSEWND_TERMINATE);
+		elseif(CloseAfterConfirm == false)then
+			Dialog.Message("ERROR", Message, MB_OK, MB_ICONSTOP, MB_DEFBUTTON1);
+			
+			if(Application.GetCurrentPage() == "devscreen")then
+				xButton.SetText("xButton3", "Retry");
+				xButton.SetEnabled("xButton3", true);
+			else
+				Button.SetText("START", "Retry");
+			Button.SetEnabled("START", true);
+			end
+		end
+	end
+end
+
+function Repair()
+	--local StartTime		 = os.clock();
+	local DetectedErrors = (0);
+	
+	function ErrorDetected(FilePath)
+		DetectedErrors = (DetectedErrors+1);
+		local FileUrl  = (HostIP.."client/"..String.Replace(FilePath, "\\", "/", true));
+		
+		local Ret, ReturnCode, Header = http.request({url=FileUrl, method="HEAD"});
+		if(ReturnCode == 200)then
+			PatchFilePath = (_SourceFolder.."\\"..FilePath);
+			--Download.Start(Application.GetWndHandle(), FileUrl, _SourceFolder.."\\"..FilePath, "", "", false, nil, -1, 0, 0);--#OLD
+			Download.Start(Application.GetWndHandle(), FileUrl, _SourceFolder.."\\"..FilePath, "", "", false, nil, -1, Header["content-length"], 0);--################ FIX DATE 1/1/2022: correcto muestreo de peso restante a descargar por el sistema de reparacion
+		else
+			ChangeStatus("Error", "Unable to connect to file\r\nCheck your Internet connection or contact an administrator.\r\nCannot continue, update canceled.", true);
+		end
+	end
+	
+	StatusDlg.SetMessage("Opening File List...");
+	local FileList			= TextFile.ReadToString(_SourceFolder.."\\checklist.txt");
+	local TotalFilesToScann = select(2, string.gsub(FileList.."\n", "(.-)\r?\n", ""));
+	local TotalFilesScanned = (0);
+	
+	StatusDlg.SetMeterRange(0, TotalFilesToScann);
+	StatusDlg.SetMessage("Validating Game Files...");
+	StatusDlg.ShowCancelButton(true, "Cancel");
+	
+	for Line in string.gmatch(FileList.."\n", "(.-)\r?\n") do
+		if(StatusDlg.IsCancelled())then
+			if(Dialog.Message("Game Files Integrity Verification", "Are you sure you want to cancel the scan?", MB_YESNO, MB_ICONQUESTION, MB_DEFBUTTON1) == 6)then
+				StatusDlg.Hide();
+				break;
+			else
+				StatusDlg.SetCancelled(false);
+			end
+		end
+		
+		local FileData = explode(Line, ",");
+		
+		StatusDlg.SetMessage("Completed: "..Math.Floor(100*TotalFilesScanned/TotalFilesToScann).."%\t(Faulty Files: "..DetectedErrors..")");
+		--StatusDlg.SetStatusText("Scanned Files: "..TotalFilesScanned.." / "..TotalFilesToScann);
+		local FilePathToScan = (_SourceFolder.."\\"..FileData[2].."");
+	   	if(File.DoesExist(FilePathToScan) == true)then
+	   		if(tostring(File.GetCRC(FilePathToScan)) ~= FileData[1])then
+	   			ErrorDetected(FileData[2]);
+			end
+	   	else
+	   		ErrorDetected(FileData[2]);
+	   	end
+	   	
+		StatusDlg.SetMeterPos(TotalFilesScanned);
+		TaskBarList.SetProgressValue(TotalFilesScanned, TotalFilesToScann);
+		
+		TotalFilesScanned = (TotalFilesScanned+1);
+	end
+	
+	StatusDlg.Hide();
+	
+	File.Delete(_SourceFolder.."\\checklist.txt", false, false, false, nil);
+	
+	--local Results = string.format("The Verification process took:\t %s\r\nScanned Files:\t%s\r\nFaulty Files:\t%s",
+	local Results = string.format("Scanned Files:\t%s\r\nFaulty Files:\t%s",
+	--					os.date("%M:%S", os.clock()-StartTime),
+						TotalFilesScanned,
+						DetectedErrors);
+	
+	Dialog.Message("Game Files Verification Completed!", Results, MB_OK, MB_ICONINFORMATION, MB_DEFBUTTON1);
+end
+
+function CreateFileList(Path)
+	StatusDlg.Show(MB_ICONNONE, false);
+	StatusDlg.ShowProgressMeter(true);
+	StatusDlg.ShowCancelButton(true, "Cancel");
+	
+	local Start = (os.clock());
+	
+	local Files = File.Find(Path, "*.*", true, false, nil, nil);
+	StatusDlg.SetMeterRange(0, #Files);
+	if(Files ~= nil)then
+		StatusDlg.SetTitle("Creating File List...");
+		
+		local FileList	 = ("");
+		local PathLength = (Path.."\\"):len()+1;
+		
+		for Count = 1, #Files do
+			if(StatusDlg.IsCancelled())then	StatusDlg.Hide();	break;	end
+			
+			local ActualFile = (Files[Count]);
+			StatusDlg.SetMessage("Completed: "..Math.Floor(100*Count/#Files).."%");
+			StatusDlg.SetMeterPos(Count);
+			
+			if(FileList == "")then
+				FileList = (File.GetCRC(ActualFile)..","..string.sub(ActualFile, PathLength));
+			else
+				FileList = (FileList.."\r\n"..File.GetCRC(ActualFile)..","..string.sub(ActualFile, PathLength));
+			end
+		end
+		
+		StatusDlg.SetMessage("Saving File List...");
+		TextFile.WriteFromString(_SourceFolder.."\\checklist.txt", FileList, false);
+		
+		StatusDlg.Hide();
+		
+		Dialog.Message("File List has been Created!", "Process took:\t"..os.date("%M:%S", os.clock()-Start).."\r\nScanned Files:\t"..#Files.."\r\nFile List Size:\t"..String.GetFormattedSize(File.GetSize(_SourceFolder.."\\checklist.txt"), FMTSIZE_AUTOMATIC, false), MB_OK, MB_ICONNONE, MB_DEFBUTTON1);
+	end
+end
+
+function CheckUpdate()
+	if(http.request({url=HostIP, method="HEAD"}) == 1)then
+		local Ret, ReturnCode, Header = http.request({url=HostIP.."patches/version.txt", method="HEAD"});
+		if(ReturnCode == 200)then
+			local Ret, ReturnCode = http.request(HostIP.."patches/version.txt");
+				if(ReturnCode == 200)then
+				local OnlineVersion = tonumber(Ret);
+				if(OnlineVersion &gt; LocalVersion)then
+					local PatchesRemaining = (OnlineVersion-LocalVersion);
+					local PatchUrl		   = (HostIP.."patches/"..(LocalVersion+1)..".zip");
+					PatchFilePath		   = (_SourceFolder.."\\"..(LocalVersion+1)..".zip");
+					
+					local Ret, ReturnCode, Header = http.request({url=PatchUrl, method="HEAD"});
+					if(ReturnCode == 200)then
+						PatchSize = (Header["content-length"]);
+						if(PatchSize ~= nil)then
+							local TotalSize = (0);
+								
+							for Count = 1, PatchesRemaining do
+								local Ret, ReturnCode, Header = http.request({url=HostIP.."patches/"..(LocalVersion+Count)..".zip", method="HEAD"});
+								if(ReturnCode == 200)then
+									local PatchSize = (Header["content-length"]);
+									if(PatchSize ~= nil)then
+										TotalSize = (TotalSize+PatchSize);
+									end
+								end
+							end
+							
+							if(Application.GetCurrentPage() == "devscreen")then
+								LoadInfo();
+							end
+							
+							ChangeStatus("Downloading");
+							DownloadSession = Download.Start(Application.GetWndHandle(), PatchUrl, PatchFilePath, "", "", File.DoesExist(PatchFilePath) and File.GetSize(PatchFilePath) &lt; tonumber(PatchSize), nil, 0, TotalSize, "");
+						else
+							ChangeStatus("Error", "Patch file error (ERROR: File size nil), contact an administrator.\r\nCannot continue, update canceled.", false);
+						end
+					else
+						ChangeStatus("Error", "Unable to connect to patch file.\r\nCheck your Internet connection or contact an administrator.\r\nCannot continue, update canceled.", false);
+					end
+				else
+					ChangeStatus("Completed");
+				end
+			else
+				ChangeStatus("Error", "Unable to connect to version file.\r\nCheck your Internet connection or contact an administrator.\r\nCannot continue, update canceled.", false);
+			end
+		else
+			ChangeStatus("Error", "Unable to connect to version file.\r\nCheck your Internet connection or contact an administrator.\r\nCannot continue, update canceled.", false);
+		end
+	else
+		ChangeStatus("Error", "Unable to connect to server.\r\nCheck your Internet connection or contact an administrator.\r\nCannot continue, update canceled.", false);
+	end
+end
+
+function ZipCallback(FilePath, Percentage, Status)
+	if(Status == ZipEx.GENERAL)then
+		UnzipPercent = (Percentage);
+		
+		if(Application.GetCurrentPage() == "style1" or Application.GetCurrentPage() == "style2" or Application.GetCurrentPage() == "style3" or Application.GetCurrentPage() == "devscreen")then
+			Progress.SetCurrentPos("Progress", Percentage);
+		elseif(Application.GetCurrentPage() == "style4")then
+			Image.SetSize("ProgressBar", Percentage*446/100, 15);
+		end
+		
+		TaskBarList.SetProgressValue(Percentage, 100);
+	else
+		Application.Sleep(0.01);
+
+		if(Application.GetCurrentPage() == "style1" or Application.GetCurrentPage() == "style2" or Application.GetCurrentPage() == "style4" or Application.GetCurrentPage() == "devscreen")then
+			Paragraph.SetText("Status", UnzipPercent.."% Completed | Unzipping File: "..FilePath.." ("..Percentage.."%)");
+		elseif(Application.GetCurrentPage() == "style3")then
+			Progress.SetText("Progress", UnzipPercent.."% Completed | Unzipping File: "..FilePath.." ("..Percentage.."%)");
+		end
+	end
+end
+
+function Download.OnProgress(tblData)
+	local Status = string.format("Remaining: %s (%s/s)",
+						String.GetFormattedSize(tblData.Data-tblData.Loaded, FMTSIZE_AUTOMATIC, false),
+						String.GetFormattedSize(Math.Floor(tblData.CurrentSpeed*1024), FMTSIZE_AUTOMATIC, true));
+	
+	if(Application.GetCurrentPage() == "style1" or Application.GetCurrentPage() == "style2" or Application.GetCurrentPage() == "style4" or Application.GetCurrentPage() == "devscreen")then
+		Paragraph.SetText("Status", tblData.Percent.."% "..Status);
+		
+		if(Application.GetCurrentPage() == "style4")then
+			Image.SetSize("ProgressBar", tblData.Percent*446/100, 15);
+		else
+			Progress.SetCurrentPos("Progress", tblData.Percent);
+		end
+	elseif(Application.GetCurrentPage() == "style3")then
+		Progress.SetText("Progress", tblData.Percent.."% "..Status);
+		Progress.SetCurrentPos("Progress", tblData.Percent);
+	end
+	
+	TaskBarList.SetProgressValue(tblData.Percent, 100);
+end
+
+function Download.OnComplete(tblData)
+	Download.Stop(tblData.Session);
+	
+	local FileData = String.SplitPath(PatchFilePath);
+	
+	if(File.DoesExist(PatchFilePath) and tonumber(File.GetSize(PatchFilePath)) == tonumber(PatchSize) and FileData.Extension == ".zip")then
+		if(Application.GetCurrentPage() == "devscreen")then--Disable Button for unzip process.
+			xButton.SetEnabled("xButton3", false);
+		else
+			Button.SetEnabled("START", false);
+		end
+		
+		ZipEx.Extract(PatchFilePath, {"*.*"}, _SourceFolder, "", "ZipCallback");
+		local ZipError = Application.GetLastError();
+		if(ZipError ~= 0)then
+			ChangeStatus("Error", _tblErrorMessages[ZipError].."\r\nContact an administrator.\r\nCannot continue, update canceled.", false);
+		elseif(ZipError == 0)then
+			LocalVersion = (LocalVersion+1);
+			
+			WriteBRN(LocalVersion, _SourceFolder.."\\vtm.brn");
+			
+			if(Application.GetCurrentPage() == "devscreen")then
+				Input.SetText("GameVersion", LocalVersion);
+			elseif(Application.GetCurrentPage() == "style5")then
+				Paragraph.SetText("GameVersion", "Game Version: "..LocalVersion);
+			end
+			
+			File.Delete(PatchFilePath, false, false, false, nil);
+			
+			CheckUpdate();
+		end
+	elseif(FileData.Filename..FileData.Extension == "checklist.txt")then
+		Repair();
+		ChangeStatus("Completed");
+	end
+	
+	Download.Delete(tblData.Session);
+end
+
+function Download.OnError(tblData)
+	Download.Delete(tblData.Session);
+	ChangeStatus("Error", "Download Error (HTTP Code: "..tblData.ErrorCode..").\r\nCannot continue, update canceled.", false);
+end
+
+function QueryAllowProjectClose()
+	Cancel = (true);
+	Download.Stop(DownloadSession);
+	Window.Close(Application.GetWndHandle(), CLOSEWND_TERMINATE);
+end
+
+function LaunchGame()
+	Window.Minimize(Application.GetWndHandle());
+	Window.Hide(Application.GetWndHandle());
+	Shell.Execute(_SourceFolder.."\\Bin\\Nksp.exe", "open", DelimitedToTable(LauncherData, ",")[2], "", SW_SHOWNORMAL, false);
+	Window.Close(Application.GetWndHandle(), CLOSEWND_TERMINATE);
+end
+
+function DelimitedToTable(String, Delimiter)
+	if not(Delimiter or #Delimiter &lt; 1)then
+		return nil
+	end
+
+	local tbl = ({});
+	local sa = (String);
+	local sD = ("");
+	local nP = string.find(sa, Delimiter, 1, true);
+
+	while(nP)do
+		sD = string.sub(sa, 1, nP-1);
+		table.insert(tbl, #tbl+1, sD);
+		sa = string.sub(sa, nP+1, -1);
+		nP = string.find(sa, Delimiter, 1, true);
+	end
+
+	if(sa ~= "")then
+		Table.Insert(tbl, #tbl+1, sa)
+	end
+
+	return tbl;
+end
+
+function explode(str, div)
+    if(div=='')then return false end
+    local pos, arr = 0, {};
+    for st,sp in function() return string.find(str,div,pos,true) end do
+        table.insert(arr,string.sub(str,pos,st-1))
+        pos = (sp + 1);
+    end
+    table.insert(arr,string.sub(str,pos))
+    return arr;
+end
+
+function Transparency()
+	DLL.CallFunction(_SystemFolder.."\\user32.dll", "SetWindowLongA", Application.GetWndHandle()..", -20, "..DLL.CallFunction(_SystemFolder.."\\user32.dll", "GetWindowLongA", Application.GetWndHandle()..", -20", DLL_RETURN_TYPE_LONG, DLL_CALL_STDCALL)+524288, DLL_RETURN_TYPE_LONG, DLL_CALL_STDCALL);
+	DLL.CallFunction(_SystemFolder.."\\user32.dll", "SetLayeredWindowAttributes", Application.GetWndHandle()..", "..Application.GetPageProperties(Application.GetCurrentPage()).BackgroundColor..", 255, 3", DLL_RETURN_TYPE_LONG, DLL_CALL_STDCALL);
+end</Script>
+<BookMarks count="0">
+</BookMarks>
+<DesignCodeLine>271</DesignCodeLine>
+<DesignCodeCol>157</DesignCodeCol>
+</Globals>
+<Defaults>
+<StartupPage>_PageFirst</StartupPage>
+<MouseOverSoundDefault>AutoPlay\Audio\High1.ogg</MouseOverSoundDefault>
+<MouseClickSoundDefault>AutoPlay\Audio\Click1.ogg</MouseClickSoundDefault>
+<MemMngMethod>1</MemMngMethod>
+<UserPrivilegeLevel>0</UserPrivilegeLevel>
+</Defaults>
+<TargetMedia>
+<TargetMediaSize>4</TargetMediaSize>
+<CustomSize>0</CustomSize>
+</TargetMedia>
+<Group>
+<CurrentGrounp>8</CurrentGrounp>
+</Group>
+<ActionPlugins>
+<Plugin>Download\Download.lmd</Plugin>
+<Plugin>TaskBarList\TaskBarList.lmd</Plugin>
+<Plugin>ZipEx\ZipEx.lmd</Plugin>
+</ActionPlugins>
+<TemplateInfo>
+<Name/>
+<Author/>
+<Contact/>
+<Web/>
+<Copyright>Copyright © 2021</Copyright>
+<Desc/>
+<Categories>General</Categories>
+<Picture/>
+</TemplateInfo>
+<ReadOrder>
+<RTLReadOrder>0</RTLReadOrder>
+</ReadOrder>
+<CodeSigning>
+<CodeSignLocation/>
+<CodeSignCertificateFile/>
+<CodeSignPVKFile/>
+<CodeSignTimeStampURL/>
+<CodeSignDescription/>
+<CodeSignDescriptionURL/>
+<CodeSignApps>0</CodeSignApps>
+<CodeSigningTool>0</CodeSigningTool>
+<Arguments/>
+</CodeSigning>
+<RuntimeSkin>
+<UseSkinFile>0</UseSkinFile>
+<SkinFilename/>
+<SkinSubStyle/>
+</RuntimeSkin>
+<Databases>
+<MySQL>0</MySQL>
+<SQLite3>0</SQLite3>
+<Oracle>0</Oracle>
+<ODBC>0</ODBC>
+<PostgreSQL>0</PostgreSQL>
+</Databases>
+<Event>
+<Name>On Startup</Name>
+<Args/>
+<Script>HostIP			      = (DelimitedToTable(LauncherData, ",")[1]);
+ServerName			  = (DelimitedToTable(LauncherData, ",")[4]);
+AllowRepairFunction   = DelimitedToTable(LauncherData, ",")[6];
+local TotalLC		  = (0);
+local DevMode		  = (false);
+local LaunchArguments = (_CommandLineArgs);
+
+if(#LaunchArguments &gt; 0)then
+	for _, Arg in pairs(LaunchArguments) do
+		if(Arg == "-resetsettings")then
+			Application.SaveValue("LastChaos "..ServerName.." Launcher", "RunOnStartup", "false");
+			Application.SaveValue("LastChaos "..ServerName.." Launcher", "StartGameAfterUpdate", "false");
+		end
+		
+		if(string.find(Arg, "-createlist"))then
+			local Path = explode(Arg, "=");
+			if(Folder.DoesExist(Path[2]))then
+				CreateFileList(Path[2]);
+			else
+				Dialog.Message("Error", Path[2].."\r\nNot Found.", MB_OK, MB_ICONSTOP, MB_DEFBUTTON1);
+			end
+		end
+		
+		if(Arg == "-installdependencies")then
+			local PWFR = Shell.Execute(_SourceFolder.."\\Launcher\\Docs\\vcredist_2010_x86.exe", "open", "/q", "", SW_SHOWNORMAL, true);
+			if(PWFR)then
+				Dialog.Message("Dependency", "VCRedist C++ 2010 Was installed!", MB_OK, MB_ICONINFORMATION, MB_DEFBUTTON1);
+			end
+			
+			local PWFR = Shell.Execute(_SourceFolder.."\\Launcher\\Docs\\dxwebsetup.exe", "open", "/q", "", SW_SHOWNORMAL, true);
+			if(PWFR)then
+				Dialog.Message("Dependency", "DirectX 9.0c Was installed!", MB_OK, MB_ICONINFORMATION, MB_DEFBUTTON1);
+			end
+		end
+		
+		if(Arg == "-dev")then
+			DevMode = (true);
+		end
+	end
+end
+
+if(DevMode == false)then
+	for PID, Path in pairs(System.EnumerateProcesses()) do
+		if(Path == _SourceFolder.."\\".._SourceFilename)then
+			if(TotalLC &gt;= 1)then
+				ChangeStatus("Error", "Only one Launcher can be run at a time.", true);
+			else
+				TotalLC = (TotalLC+1);
+			end
+		end
+		
+		if(DelimitedToTable(LauncherData, ",")[3] == "false")then
+			if(Path == _SourceFolder.."\\Bin\\Nksp.exe")then
+				ChangeStatus("Error", "Only one LastChaos Client can be run at a time.", true);
+			end
+		end
+	end
+	
+	Page.Jump(DelimitedToTable(LauncherData, ",")[5]);
+else
+	Page.Jump("devscreen");
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>45</DesignCodeLine>
+<DesignCodeCol>4</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Shutdown</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Size</Name>
+<Args>number e_WindowWidth, number e_WindowHeight, number e_PageWidth, number e_PageHeight, number e_Type</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Menu</Name>
+<Args>number e_ID, table e_ItemInfo</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<EXEResourceInfo>
+<ReplaceIcon>1</ReplaceIcon>
+<IconFilename>AutoPlay\Icons\32x32.ico</IconFilename>
+<ReplaceVersionInfo>1</ReplaceVersionInfo>
+<FileVer1>7</FileVer1>
+<FileVer2>0</FileVer2>
+<FileVer3>0</FileVer3>
+<FileVer4>5</FileVer4>
+<ProductVer1>2</ProductVer1>
+<ProductVer2>0</ProductVer2>
+<ProductVer3>0</ProductVer3>
+<ProductVer4>0</ProductVer4>
+<Comments>Created with AutoPlay Media Studio</Comments>
+<Company>NicolasG</Company>
+<FileDescription>LastChaos Launcher</FileDescription>
+<LegalCopyright/>
+<LegalTrademarks/>
+<PrivateBuild/>
+<ProductName>LastChaos Launcher</ProductName>
+<SpecialBuild/>
+</EXEResourceInfo>
+<HGuidelines/>
+<VGuidelines/>
+<MenuBar>
+<Enabled>0</Enabled>
+<UseIcons>0</UseIcons>
+<BitmapIconFile/>
+<TransColor format="hex">ffffff</TransColor>
+<MenuItem>
+<Text>Main Menu &amp;1</Text>
+<ID>100</ID>
+<Enabled>1</Enabled>
+<Checked>0</Checked>
+<SubMenu>
+<MenuItem>
+<Text>Sub Menu &amp;1</Text>
+<ID>101</ID>
+<Enabled>1</Enabled>
+<Checked>0</Checked>
+<SubMenu/>
+<IconID>-1</IconID>
+</MenuItem>
+<MenuItem>
+<Text>Sub Menu &amp;2</Text>
+<ID>102</ID>
+<Enabled>1</Enabled>
+<Checked>0</Checked>
+<SubMenu/>
+<IconID>-1</IconID>
+</MenuItem>
+</SubMenu>
+<IconID>-1</IconID>
+</MenuItem>
+<MenuItem>
+<Text>Main Menu &amp;2</Text>
+<ID>200</ID>
+<Enabled>1</Enabled>
+<Checked>0</Checked>
+<SubMenu>
+<MenuItem>
+<Text>Sub Menu &amp;1</Text>
+<ID>201</ID>
+<Enabled>1</Enabled>
+<Checked>0</Checked>
+<SubMenu/>
+<IconID>-1</IconID>
+</MenuItem>
+<MenuItem>
+<Text>Sub Menu &amp;2</Text>
+<ID>202</ID>
+<Enabled>1</Enabled>
+<Checked>0</Checked>
+<SubMenu/>
+<IconID>-1</IconID>
+</MenuItem>
+</SubMenu>
+<IconID>-1</IconID>
+</MenuItem>
+</MenuBar>
+</ProjectInfo>
+<Page>
+<Name>devscreen</Name>
+<InheritObs/>
+<InheritBG/>
+<Description/>
+<Keywords/>
+<Background>
+<Type>0</Type>
+<ImageStyle>0</ImageStyle>
+<TopColor>16711680</TopColor>
+<BottomColor>16777215</BottomColor>
+<UseCustomBackgroundSettings>0</UseCustomBackgroundSettings>
+<TransitionEffect/>
+<TransProps/>
+<NormalImage>
+<Filename/>
+</NormalImage>
+</Background>
+<Event>
+<Name>On Preload</Name>
+<Args/>
+<Script>Window.SetSize(Application.GetWndHandle(), 600, 480);
+Window.SetText(Application.GetWndHandle(), ServerName);
+Window.SetPos(Application.GetWndHandle(), System.GetDisplayInfo().Width / 2- Window.GetSize(Application.GetWndHandle()).Width / 2, System.GetDisplayInfo().Height / 2 - Window.GetSize(Application.GetWndHandle()).Height / 2);</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>53</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Show</Name>
+<Args/>
+<Script>Input.SetText("GameVersion", LocalVersion);
+Input.SetText("LoginServer", ReadDTA(_SourceFolder.."\\sl.dta"));
+Input.SetText("HostIP", HostIP);
+Input.SetText("NkspLaunchParameter", DelimitedToTable(LauncherData, ",")[2]);
+
+local AllowMultiClient = DelimitedToTable(LauncherData, ",")[3];
+if(AllowMultiClient == "false")then
+	CheckBox.SetChecked("AllowMultiClient", false);
+elseif(AllowMultiClient == "true")then
+	CheckBox.SetChecked("AllowMultiClient", true);
+else
+	Dialog.Message("Wrong Config file", "'Allow multi Client' is neither true nor false, please set this parameter.", MB_OK, MB_ICONSTOP, MB_DEFBUTTON1);
+end
+
+if(AllowRepairFunction == "false")then
+	CheckBox.SetChecked("AllowVerifyGameFilesFunction", false);
+elseif(AllowRepairFunction == "true")then
+	CheckBox.SetChecked("AllowVerifyGameFilesFunction", true);
+end
+
+Input.SetText("ServerName", DelimitedToTable(LauncherData, ",")[4]);
+
+local LauncherStyle = DelimitedToTable(LauncherData, ",")[5];
+if(LauncherStyle == "style1")then
+	ComboBox.SetSelected("ComboBox1", 1);
+elseif(LauncherStyle == "style2")then
+	ComboBox.SetSelected("ComboBox1", 2);
+elseif(LauncherStyle == "style3")then
+	ComboBox.SetSelected("ComboBox1", 3);
+elseif(LauncherStyle == "style4")then
+	ComboBox.SetSelected("ComboBox1", 4);
+elseif(LauncherStyle == "devscreen")then
+	ComboBox.SetSelected("ComboBox1", 5);
+else
+	Dialog.Message("Wrong Config file", "'Launcher Style' is neither style1/style2/style3/style4/devscreen, please set this parameter.", MB_OK, MB_ICONSTOP, MB_DEFBUTTON1);
+end
+
+function LoadInfo()
+	if(http.request({url=HostIP, method="HEAD"}) == 1)then
+		local VersionFileURL = (HostIP.."patches/version.txt");
+		local Version, ReturnCode = http.request(VersionFileURL);
+		if(ReturnCode == 200)then
+			local OnlineVersion = (tonumber(Version));
+			
+			ListBox.DeleteItem("PatchesList", -1);
+			
+			for Count = 1, OnlineVersion do
+				local Ret, ReturnCode, Header = http.request({url=HostIP.."patches/"..Count..".zip", method="HEAD"});
+				if(ReturnCode == 200)then
+					local PatchSize = (Header["content-length"]);
+					if(PatchSize ~= nil)then
+						ListBox.AddItem("PatchesList", Count..".zip\t"..String.GetFormattedSize(PatchSize, FMTSIZE_AUTOMATIC, false).."\t "..HostIP.."patches/"..Count..".zip", "");
+					else
+						ListBox.AddItem("PatchesList", Count..".zip\t ERROR\t(FILE Size: "..tostring(PatchSize)..")", "");
+					end
+				else
+					ListBox.AddItem("PatchesList", Count..".zip\t ERROR\tFILE NOT FOUND\t(HTTP Code: "..ReturnCode..")", "");
+				end
+			end
+			
+			if(LocalVersion &lt; OnlineVersion)then
+				local TotalSize		   = (0);
+				local PatchesRemaining = (OnlineVersion-LocalVersion);
+				local RelativeVersion  = (LocalVersion);
+				
+				for Count = 1, PatchesRemaining do
+					RelativeVersion = (RelativeVersion+1);
+					
+					local Ret, ReturnCode, Header = http.request({url=HostIP.."patches/"..RelativeVersion..".zip", method="HEAD"});
+					if(ReturnCode == 200)then
+						local PatchSize = (Header["content-length"]);
+						if(PatchSize ~= nil)then
+							TotalSize = (TotalSize+PatchSize);
+						end
+					end
+				end
+				
+				Paragraph.SetText("PatchesRemaining", "Patches Remaining: "..PatchesRemaining);
+				Paragraph.SetText("PatchesRemainingTotalSize", "Combined Patches Size: "..String.GetFormattedSize(Math.Floor(TotalSize), FMTSIZE_AUTOMATIC, false));
+				Paragraph.SetText("Status", "Updates pending...");
+				Progress.SetCurrentPos("Progress", 0);
+				xButton.SetText("xButton3", "Start Update");
+				xButton.SetEnabled("xButton3", true);
+			elseif(LocalVersion == OnlineVersion)then
+				Paragraph.SetText("PatchesRemaining", "Patches Remaining: 0");
+				Paragraph.SetText("PatchesRemainingTotalSize", "Combined Patches Size: 0");
+				Paragraph.SetText("Status", "Update Completed!");
+				Progress.SetCurrentPos("Progress", 100);
+				xButton.SetText("xButton3", "Start Game");
+				xButton.SetEnabled("xButton3", true);
+			end
+		else
+			Dialog.Message("Error", "Unable to connect to version file...\r\n("..VersionFileURL..")\r\nHTTP Code: "..ReturnCode, MB_OK, MB_ICONSTOP, MB_DEFBUTTON1);
+		end
+	else
+		Dialog.Message("Error", "Unable to connect to server...\r\n("..HostIP..")", MB_OK, MB_ICONSTOP, MB_DEFBUTTON1);
+	end
+end
+
+LoadInfo();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>13</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Close</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Timer</Name>
+<Args>number e_ID</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Audio</Name>
+<Args>number e_Channel, string e_State</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Size</Name>
+<Args>number e_WindowWidth, number e_WindowHeight, number e_PageWidth, number e_PageHeight, number e_Type</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Menu</Name>
+<Args>number e_ID, table e_ItemInfo</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Button</Name>
+<Args>number e_Type, number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Move</Name>
+<Args>number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Wheel</Name>
+<Args>table e_Flags, number e_Delta, number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Object>
+<Type>40</Type>
+<Name>Plugin1</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>1</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>8</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>100</Top>
+<Bottom>391</Bottom>
+<Left>380</Left>
+<Right>591</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>658750</DesignCodeLine>
+<DesignCodeCol>1080623114</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>658688</DesignCodeLine>
+<DesignCodeCol>10</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>3158064</DesignCodeLine>
+<DesignCodeCol>258848128</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On RightClick</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>222193004</DesignCodeLine>
+<DesignCodeCol>3538954</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<PLUGIN>
+<DLLFile>ShapeEx\ShapeEx.apo</DLLFile>
+<CustomData>0,8026746,1,-1,30,30,110,30,20,2,0,0,0</CustomData>
+</PLUGIN>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Paragraph4</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>1</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>8</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>90</Top>
+<Bottom>113</Bottom>
+<Left>390</Left>
+<Right>494</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>486541837</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>2830382</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>1079123968</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>54</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Launcher Settings</Body>
+<NormalColor>0</NormalColor>
+<HighlightColor>0</HighlightColor>
+<MouseDownColor>0</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>15790320</BackColor>
+<FontData>
+<FontName>Segoe UI Semibold</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>600</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>0</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>40</Type>
+<Name>Plugin3</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>1</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>396</Top>
+<Bottom>421</Bottom>
+<Left>10</Left>
+<Right>371</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>658750</DesignCodeLine>
+<DesignCodeCol>1080623114</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>658688</DesignCodeLine>
+<DesignCodeCol>10</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>3158064</DesignCodeLine>
+<DesignCodeCol>258848128</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On RightClick</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>222193004</DesignCodeLine>
+<DesignCodeCol>3538954</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<PLUGIN>
+<DLLFile>ShapeEx\ShapeEx.apo</DLLFile>
+<CustomData>0,8026746,1,-1,30,30,110,30,20,2,0,0,0</CustomData>
+</PLUGIN>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Object>
+<Object>
+<Type>11</Type>
+<Name>Progress</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>450</Top>
+<Bottom>471</Bottom>
+<Left>10</Left>
+<Right>501</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>3158845</DesignCodeLine>
+<DesignCodeCol>1380015954</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Orientation>0</Orientation>
+<Style>1</Style>
+<XPStyleBars>0</XPStyleBars>
+<Maximum>100</Maximum>
+<Minimum>0</Minimum>
+<Step>0</Step>
+<BarColor format="hex">6282a0</BarColor>
+<BackgroundColor format="hex">ffffff</BackgroundColor>
+<TextColor format="hex">000000</TextColor>
+<ProgressText/>
+<UseCustomColours>1</UseCustomColours>
+</Options>
+<Font>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Font>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Status</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>430</Top>
+<Bottom>461</Bottom>
+<Left>10</Left>
+<Right>501</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>4079394</DesignCodeLine>
+<DesignCodeCol>1818391562</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>4079394</DesignCodeLine>
+<DesignCodeCol>-2080372211</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>1078018048</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>1866689634</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body/>
+<NormalColor>2147483647</NormalColor>
+<HighlightColor>2147483647</HighlightColor>
+<MouseDownColor>2147483647</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>12632256</BackColor>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>0</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Paragraph1</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>0</Top>
+<Bottom>31</Bottom>
+<Left>10</Left>
+<Right>371</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>486541837</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>2830382</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>1079123968</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>54</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Patches List</Body>
+<NormalColor>0</NormalColor>
+<HighlightColor>0</HighlightColor>
+<MouseDownColor>0</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Segoe UI Semibold</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>600</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>1</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Paragraph2</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>0</Top>
+<Bottom>31</Bottom>
+<Left>380</Left>
+<Right>531</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>486541837</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>2830382</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>1079123968</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>54</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Game Version</Body>
+<NormalColor>0</NormalColor>
+<HighlightColor>0</HighlightColor>
+<MouseDownColor>0</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Segoe UI Semibold</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>600</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Paragraph3</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>50</Top>
+<Bottom>81</Bottom>
+<Left>380</Left>
+<Right>531</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>486541837</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>2830382</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>1079123968</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>54</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Login Server Connection</Body>
+<NormalColor>0</NormalColor>
+<HighlightColor>0</HighlightColor>
+<MouseDownColor>0</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Segoe UI Semibold</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>600</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Paragraph6</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip>EP1: 6574 / EP2: 4022 / EP3 &amp; Up: fkzktlfgod!</ToolTip>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>160</Top>
+<Bottom>191</Bottom>
+<Left>390</Left>
+<Right>581</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>486541837</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>2830382</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>1079123968</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>54</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Nksp Launch Parameter</Body>
+<NormalColor>0</NormalColor>
+<HighlightColor>0</HighlightColor>
+<MouseDownColor>0</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Segoe UI Semibold</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>600</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Paragraph8</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>230</Top>
+<Bottom>261</Bottom>
+<Left>390</Left>
+<Right>581</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>486541837</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>2830382</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>1079123968</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>54</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Server Name</Body>
+<NormalColor>0</NormalColor>
+<HighlightColor>0</HighlightColor>
+<MouseDownColor>0</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Segoe UI Semibold</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>600</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Paragraph10</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>280</Top>
+<Bottom>311</Bottom>
+<Left>390</Left>
+<Right>581</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>486541837</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>2830382</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>1079123968</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>54</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Style</Body>
+<NormalColor>0</NormalColor>
+<HighlightColor>0</HighlightColor>
+<MouseDownColor>0</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Segoe UI Semibold</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>600</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Paragraph5</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>113</Top>
+<Bottom>144</Bottom>
+<Left>390</Left>
+<Right>581</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>486541837</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>2830382</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>1079123968</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>20803</DesignCodeLine>
+<DesignCodeCol>54</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Host IP</Body>
+<NormalColor>0</NormalColor>
+<HighlightColor>0</HighlightColor>
+<MouseDownColor>0</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Segoe UI Semibold</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>600</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>PatchesRemaining</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>397</Top>
+<Bottom>422</Bottom>
+<Left>10</Left>
+<Right>161</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1635020399</DesignCodeLine>
+<DesignCodeCol>7957612</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1651077746</DesignCodeLine>
+<DesignCodeCol>1082130529</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1918988130</DesignCodeLine>
+<DesignCodeCol>1082130532</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>28522</DesignCodeLine>
+<DesignCodeCol>1082186752</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Patches Remaining:</Body>
+<NormalColor>0</NormalColor>
+<HighlightColor>0</HighlightColor>
+<MouseDownColor>0</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>12632256</BackColor>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>PatchesRemainingTotalSize</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>397</Top>
+<Bottom>422</Bottom>
+<Left>160</Left>
+<Right>371</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1635020399</DesignCodeLine>
+<DesignCodeCol>7957612</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1651077746</DesignCodeLine>
+<DesignCodeCol>1082130529</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1918988130</DesignCodeLine>
+<DesignCodeCol>1082130532</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>28522</DesignCodeLine>
+<DesignCodeCol>1082186752</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Combined Patches Size:</Body>
+<NormalColor>0</NormalColor>
+<HighlightColor>0</HighlightColor>
+<MouseDownColor>0</MouseDownColor>
+<DisabledColor>2147483647</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>12632256</BackColor>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>2</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>20</Type>
+<Name>xButton3</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip>Do not touch the configuration during the download, in any case pause it and make the modifications you want, I do not want to write more code: #</ToolTip>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>430</Top>
+<Bottom>471</Bottom>
+<Left>510</Left>
+<Right>591</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>local State = xButton.GetText(this);
+if(State == "Start Update" or State == "Resume" or State == "Retry")then
+	CheckUpdate();
+elseif(State == "Pause")then
+	ChangeStatus("Paused");
+elseif(State == "Start Game")then
+	LaunchGame();
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>2</DesignCodeLine>
+<DesignCodeCol>15</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Hyperlink</Name>
+<Args>string e_Hyperlink</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Text>Start Update</Text>
+<TextColor format="hex">000000</TextColor>
+<EnableMarkup>0</EnableMarkup>
+<ButtonImage/>
+<TextAlignment>2</TextAlignment>
+<ImageAlignment>0</ImageAlignment>
+<ImageTextRelation>3</ImageTextRelation>
+<Theme>6</Theme>
+<Style>0</Style>
+<State>0</State>
+<MouseOverSoundMode>0</MouseOverSoundMode>
+<MouseOverSound/>
+<MouseClickSoundMode>0</MouseClickSoundMode>
+<MouseClickSound/>
+</Options>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Object>
+<Object>
+<Type>20</Type>
+<Name>xButton1</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>400</Top>
+<Bottom>421</Bottom>
+<Left>380</Left>
+<Right>591</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>local Path = Dialog.FolderBrowse("Select Client folder", _DesktopFolder);
+if(Path ~= "CANCEL" and Path ~= nil)then
+	CreateFileList(Path);
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>2</DesignCodeLine>
+<DesignCodeCol>20</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Hyperlink</Name>
+<Args>string e_Hyperlink</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Text>Create Verification File List</Text>
+<TextColor format="hex">000000</TextColor>
+<EnableMarkup>0</EnableMarkup>
+<ButtonImage/>
+<TextAlignment>2</TextAlignment>
+<ImageAlignment>0</ImageAlignment>
+<ImageTextRelation>3</ImageTextRelation>
+<Theme>6</Theme>
+<Style>0</Style>
+<State>0</State>
+<MouseOverSoundMode>0</MouseOverSoundMode>
+<MouseOverSound/>
+<MouseClickSoundMode>0</MouseClickSoundMode>
+<MouseClickSound/>
+</Options>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Object>
+<Object>
+<Type>20</Type>
+<Name>xButton7</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip>It also serves to do a Refresh</ToolTip>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>360</Top>
+<Bottom>381</Bottom>
+<Left>390</Left>
+<Right>581</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>HostIP = Input.GetText("HostIP");
+WriteDTA(_SourceFolder.."\\lccnct.dta", HostIP..","..Input.GetText("NkspLaunchParameter")..","..tostring(CheckBox.GetChecked("AllowMultiClient"))..","..Input.GetText("ServerName")..","..ComboBox.GetItemData("ComboBox1", ComboBox.GetSelected("ComboBox1"))..","..tostring(CheckBox.GetChecked("AllowVerifyGameFilesFunction")));
+LoadInfo();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1</DesignCodeLine>
+<DesignCodeCol>307</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Hyperlink</Name>
+<Args>string e_Hyperlink</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Text>Save</Text>
+<TextColor format="hex">000000</TextColor>
+<EnableMarkup>0</EnableMarkup>
+<ButtonImage/>
+<TextAlignment>2</TextAlignment>
+<ImageAlignment>0</ImageAlignment>
+<ImageTextRelation>3</ImageTextRelation>
+<Theme>6</Theme>
+<Style>0</Style>
+<State>0</State>
+<MouseOverSoundMode>0</MouseOverSoundMode>
+<MouseOverSound/>
+<MouseClickSoundMode>0</MouseClickSoundMode>
+<MouseClickSound/>
+</Options>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Object>
+<Object>
+<Type>15</Type>
+<Name>AllowVerifyGameFilesFunction</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>333</Top>
+<Bottom>350</Bottom>
+<Left>390</Left>
+<Right>585</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Text>Allow Verify Game Files Function</Text>
+<NormalColor format="hex">000000</NormalColor>
+<HighlightColor format="hex">000000</HighlightColor>
+<MouseDownColor format="hex">000000</MouseDownColor>
+<Disabled format="hex">c0c0c0</Disabled>
+<Alignment>0</Alignment>
+<ButtonAlign>0</ButtonAlign>
+<RTLReadingOrder>0</RTLReadingOrder>
+<Checked>0</Checked>
+<MouseOverSoundMode>0</MouseOverSoundMode>
+<MouseOverSound/>
+<MouseClickSoundMode>0</MouseClickSoundMode>
+<MouseClickSound/>
+</Options>
+<Font>
+<FontData>
+<FontName>Segoe UI Semibold</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>600</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Font>
+</Object>
+<Object>
+<Type>10</Type>
+<Name>ComboBox1</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>300</Top>
+<Bottom>323</Bottom>
+<Left>390</Left>
+<Right>581</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Select</Name>
+<Args>number e_Selection</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Focus</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<Options>
+<Sort>0</Sort>
+<ComboType>0</ComboType>
+<LinesToDisplay>5</LinesToDisplay>
+<TextColor format="hex">000000</TextColor>
+<BackgroundColor format="hex">ffffff</BackgroundColor>
+<ReadOrder>0</ReadOrder>
+</Options>
+<Font>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Font>
+<ComboItems>
+<ComboItem>
+<Text>Style 1</Text>
+<Data>style1</Data>
+</ComboItem>
+<ComboItem>
+<Text>Style 2</Text>
+<Data>style2</Data>
+</ComboItem>
+<ComboItem>
+<Text>Style 3</Text>
+<Data>style3</Data>
+</ComboItem>
+<ComboItem>
+<Text>Custom Style</Text>
+<Data>style4</Data>
+</ComboItem>
+<ComboItem>
+<Text>DevScreen</Text>
+<Data>devscreen</Data>
+</ComboItem>
+</ComboItems>
+</Object>
+<Object>
+<Type>7</Type>
+<Name>ServerName</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>250</Top>
+<Bottom>271</Bottom>
+<Left>390</Left>
+<Right>581</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>2573</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Focus</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>1078329354</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Char</Name>
+<Args>number e_Char, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<Text>
+<Body/>
+<TextColor>0</TextColor>
+<BackgroundColor>16777215</BackgroundColor>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>1</Alignment>
+<RightToLeftReadingOrder>0</RightToLeftReadingOrder>
+</Text>
+<Box>
+<BorderStyle>1</BorderStyle>
+<VerticalScrollbar>1</VerticalScrollbar>
+<HorizontalScrollbar>0</HorizontalScrollbar>
+<Style>0</Style>
+<Mode>0</Mode>
+<Mask/>
+<MaskSymbol> </MaskSymbol>
+<MaskRetMode>0</MaskRetMode>
+<ReadOnly>0</ReadOnly>
+</Box>
+</Object>
+<Object>
+<Type>15</Type>
+<Name>AllowMultiClient</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>210</Top>
+<Bottom>227</Bottom>
+<Left>390</Left>
+<Right>581</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Text>Allow Multi Client</Text>
+<NormalColor format="hex">000000</NormalColor>
+<HighlightColor format="hex">000000</HighlightColor>
+<MouseDownColor format="hex">000000</MouseDownColor>
+<Disabled format="hex">c0c0c0</Disabled>
+<Alignment>0</Alignment>
+<ButtonAlign>0</ButtonAlign>
+<RTLReadingOrder>0</RTLReadingOrder>
+<Checked>0</Checked>
+<MouseOverSoundMode>0</MouseOverSoundMode>
+<MouseOverSound/>
+<MouseClickSoundMode>0</MouseClickSoundMode>
+<MouseClickSound/>
+</Options>
+<Font>
+<FontData>
+<FontName>Segoe UI Semibold</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>600</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Font>
+</Object>
+<Object>
+<Type>7</Type>
+<Name>NkspLaunchParameter</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip>EP1: 6574 / EP2: 4022 / EP3 &amp; Up: fkzktlfgod!</ToolTip>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>180</Top>
+<Bottom>201</Bottom>
+<Left>390</Left>
+<Right>581</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>2573</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Focus</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>1078329354</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Char</Name>
+<Args>number e_Char, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<Text>
+<Body/>
+<TextColor>0</TextColor>
+<BackgroundColor>16777215</BackgroundColor>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>1</Alignment>
+<RightToLeftReadingOrder>0</RightToLeftReadingOrder>
+</Text>
+<Box>
+<BorderStyle>1</BorderStyle>
+<VerticalScrollbar>1</VerticalScrollbar>
+<HorizontalScrollbar>0</HorizontalScrollbar>
+<Style>0</Style>
+<Mode>0</Mode>
+<Mask/>
+<MaskSymbol> </MaskSymbol>
+<MaskRetMode>0</MaskRetMode>
+<ReadOnly>0</ReadOnly>
+</Box>
+</Object>
+<Object>
+<Type>7</Type>
+<Name>HostIP</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>133</Top>
+<Bottom>154</Bottom>
+<Left>390</Left>
+<Right>581</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>2573</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Focus</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>1078329354</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Char</Name>
+<Args>number e_Char, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<Text>
+<Body/>
+<TextColor>0</TextColor>
+<BackgroundColor>16777215</BackgroundColor>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>1</Alignment>
+<RightToLeftReadingOrder>0</RightToLeftReadingOrder>
+</Text>
+<Box>
+<BorderStyle>1</BorderStyle>
+<VerticalScrollbar>1</VerticalScrollbar>
+<HorizontalScrollbar>0</HorizontalScrollbar>
+<Style>0</Style>
+<Mode>0</Mode>
+<Mask/>
+<MaskSymbol> </MaskSymbol>
+<MaskRetMode>0</MaskRetMode>
+<ReadOnly>0</ReadOnly>
+</Box>
+</Object>
+<Object>
+<Type>20</Type>
+<Name>xButton6</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>70</Top>
+<Bottom>91</Bottom>
+<Left>540</Left>
+<Right>591</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>WriteDTA(_SourceFolder.."\\sl.dta", Input.GetText("LoginServer"));</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>66</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Hyperlink</Name>
+<Args>string e_Hyperlink</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Text>Save</Text>
+<TextColor format="hex">000000</TextColor>
+<EnableMarkup>0</EnableMarkup>
+<ButtonImage/>
+<TextAlignment>2</TextAlignment>
+<ImageAlignment>0</ImageAlignment>
+<ImageTextRelation>3</ImageTextRelation>
+<Theme>6</Theme>
+<Style>0</Style>
+<State>0</State>
+<MouseOverSoundMode>0</MouseOverSoundMode>
+<MouseOverSound/>
+<MouseClickSoundMode>0</MouseClickSoundMode>
+<MouseClickSound/>
+</Options>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Object>
+<Object>
+<Type>7</Type>
+<Name>LoginServer</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>70</Top>
+<Bottom>91</Bottom>
+<Left>380</Left>
+<Right>531</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>2573</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Focus</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>1078329354</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Char</Name>
+<Args>number e_Char, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<Text>
+<Body/>
+<TextColor>0</TextColor>
+<BackgroundColor>16777215</BackgroundColor>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>1</Alignment>
+<RightToLeftReadingOrder>0</RightToLeftReadingOrder>
+</Text>
+<Box>
+<BorderStyle>1</BorderStyle>
+<VerticalScrollbar>1</VerticalScrollbar>
+<HorizontalScrollbar>0</HorizontalScrollbar>
+<Style>0</Style>
+<Mode>0</Mode>
+<Mask/>
+<MaskSymbol> </MaskSymbol>
+<MaskRetMode>0</MaskRetMode>
+<ReadOnly>0</ReadOnly>
+</Box>
+</Object>
+<Object>
+<Type>20</Type>
+<Name>xButton5</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip>It also serves to do a Refresh</ToolTip>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>20</Top>
+<Bottom>41</Bottom>
+<Left>540</Left>
+<Right>591</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>LocalVersion = tonumber(Input.GetText("GameVersion"));
+WriteBRN(LocalVersion, _SourceFolder.."\\vtm.brn");
+LoadInfo();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>2</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Hyperlink</Name>
+<Args>string e_Hyperlink</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Text>Save</Text>
+<TextColor format="hex">000000</TextColor>
+<EnableMarkup>0</EnableMarkup>
+<ButtonImage/>
+<TextAlignment>2</TextAlignment>
+<ImageAlignment>0</ImageAlignment>
+<ImageTextRelation>3</ImageTextRelation>
+<Theme>6</Theme>
+<Style>0</Style>
+<State>0</State>
+<MouseOverSoundMode>0</MouseOverSoundMode>
+<MouseOverSound/>
+<MouseClickSoundMode>0</MouseClickSoundMode>
+<MouseClickSound/>
+</Options>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Object>
+<Object>
+<Type>7</Type>
+<Name>GameVersion</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>20</Top>
+<Bottom>41</Bottom>
+<Left>380</Left>
+<Right>531</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>2573</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Focus</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>1078329354</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Char</Name>
+<Args>number e_Char, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<Text>
+<Body/>
+<TextColor>0</TextColor>
+<BackgroundColor>16777215</BackgroundColor>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>1</Alignment>
+<RightToLeftReadingOrder>0</RightToLeftReadingOrder>
+</Text>
+<Box>
+<BorderStyle>1</BorderStyle>
+<VerticalScrollbar>1</VerticalScrollbar>
+<HorizontalScrollbar>0</HorizontalScrollbar>
+<Style>0</Style>
+<Mode>0</Mode>
+<Mask/>
+<MaskSymbol> </MaskSymbol>
+<MaskRetMode>0</MaskRetMode>
+<ReadOnly>0</ReadOnly>
+</Box>
+</Object>
+<Object>
+<Type>9</Type>
+<Name>PatchesList</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>20</Top>
+<Bottom>397</Bottom>
+<Left>10</Left>
+<Right>371</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Double-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Select</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Focus</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Check</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<Text>
+<TextColor>2147483647</TextColor>
+<BackgroundColor>16777215</BackgroundColor>
+<FontData>
+<FontName>Segoe UI</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-12</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Text>
+<Window>
+<BorderStyle>1</BorderStyle>
+<VerticalScrollbar>1</VerticalScrollbar>
+<HorizontalScrollbar>0</HorizontalScrollbar>
+<Sort>0</Sort>
+<MultipleSelect>0</MultipleSelect>
+<ReadOrder>0</ReadOrder>
+<CheckList>0</CheckList>
+</Window>
+<ListBoxItems>
+<ListItem>
+<Text>Fix read line 271 (Global Functions)</Text>
+<Data/>
+<Check>0</Check>
+</ListItem>
+</ListBoxItems>
+</Object>
+<HGuidelines/>
+<VGuidelines/>
+</Page>
+<Page>
+<Name>style1</Name>
+<InheritObs/>
+<InheritBG/>
+<Description/>
+<Keywords/>
+<Background>
+<Type>2</Type>
+<ImageStyle>0</ImageStyle>
+<TopColor>16711680</TopColor>
+<BottomColor>16777215</BottomColor>
+<UseCustomBackgroundSettings>1</UseCustomBackgroundSettings>
+<TransitionEffect/>
+<TransProps/>
+<NormalImage>
+<Filename>AutoPlay\Images\style1\background.bmp</Filename>
+</NormalImage>
+</Background>
+<Event>
+<Name>On Preload</Name>
+<Args/>
+<Script>Window.SetSize(Application.GetWndHandle(), 701, 429);
+Window.SetText(Application.GetWndHandle(), ServerName);
+Window.SetPos(Application.GetWndHandle(), System.GetDisplayInfo().Width / 2- Window.GetSize(Application.GetWndHandle()).Width / 2, System.GetDisplayInfo().Height / 2 - Window.GetSize(Application.GetWndHandle()).Height / 2);</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>2</DesignCodeLine>
+<DesignCodeCol>223</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Show</Name>
+<Args/>
+<Script>WKE.LoadURL("Web", HostIP.."style1.html");
+
+CheckUpdate();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Close</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Timer</Name>
+<Args>number e_ID</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Audio</Name>
+<Args>number e_Channel, string e_State</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Size</Name>
+<Args>number e_WindowWidth, number e_WindowHeight, number e_PageWidth, number e_PageHeight, number e_Type</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Menu</Name>
+<Args>number e_ID, table e_ItemInfo</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script>if(e_Key == 116)then
+	WKE.LoadURL("Web", HostIP.."style1.html");
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Button</Name>
+<Args>number e_Type, number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Move</Name>
+<Args>number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Wheel</Name>
+<Args>table e_Flags, number e_Delta, number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Object>
+<Type>11</Type>
+<Name>Progress</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>405</Top>
+<Bottom>415</Bottom>
+<Left>12</Left>
+<Right>376</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1918988130</DesignCodeLine>
+<DesignCodeCol>100</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Orientation>0</Orientation>
+<Style>1</Style>
+<XPStyleBars>0</XPStyleBars>
+<Maximum>100</Maximum>
+<Minimum>0</Minimum>
+<Step>0</Step>
+<BarColor format="hex">be6200</BarColor>
+<BackgroundColor format="hex">313541</BackgroundColor>
+<TextColor format="hex">ffc383</TextColor>
+<ProgressText/>
+<UseCustomColours>1</UseCustomColours>
+</Options>
+<Font>
+<FontData>
+<FontName>Calibri</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-11</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Font>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Status</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>1</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>388</Top>
+<Bottom>417</Bottom>
+<Left>8</Left>
+<Right>381</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1701080175</DesignCodeLine>
+<DesignCodeCol>11890</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1701080175</DesignCodeLine>
+<DesignCodeCol>11890</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1632793699</DesignCodeLine>
+<DesignCodeCol>7301492</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Connecting Patch Server...</Body>
+<NormalColor>8635391</NormalColor>
+<HighlightColor>8635391</HighlightColor>
+<MouseDownColor>8635391</MouseDownColor>
+<DisabledColor>8635391</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Calibri</FontName>
+<CharacterSet>204</CharacterSet>
+<Height>-11</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Paragraph2</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>351</Top>
+<Bottom>371</Bottom>
+<Left>8</Left>
+<Right>371</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1701080175</DesignCodeLine>
+<DesignCodeCol>11890</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1701080175</DesignCodeLine>
+<DesignCodeCol>11890</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1632793699</DesignCodeLine>
+<DesignCodeCol>7301492</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>LastChaos Launcher By NicolasG
+</Body>
+<NormalColor>11974326</NormalColor>
+<HighlightColor>11974326</HighlightColor>
+<MouseDownColor>11974326</MouseDownColor>
+<DisabledColor>12632256</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Candara</FontName>
+<CharacterSet>204</CharacterSet>
+<Height>-11</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>START</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>379</Top>
+<Bottom>415</Bottom>
+<Left>387</Left>
+<Right>496</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>local State = Button.GetText(this);
+if(State == "Resume" or State == "Retry")then
+	CheckUpdate();
+elseif(State == "Pause")then
+	ChangeStatus("Paused");
+elseif(State == "Start Game")then
+	LaunchGame();
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>4</DesignCodeLine>
+<DesignCodeCol>24</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\style1\button.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption>Start Game</Caption>
+<Align>1</Align>
+<UpColor>5354225</UpColor>
+<HighlightColor>5354225</HighlightColor>
+<DownColor>5354225</DownColor>
+<DisabledColor>9539985</DisabledColor>
+<FontData>
+<FontName>Arial</FontName>
+<CharacterSet>204</CharacterSet>
+<Height>-13</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>0</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>EXIT</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>379</Top>
+<Bottom>415</Bottom>
+<Left>607</Left>
+<Right>686</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>10</Type>
+<Name>Exit/Close</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\style1\button_small.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption>Exit</Caption>
+<Align>1</Align>
+<UpColor>5354225</UpColor>
+<HighlightColor>5354225</HighlightColor>
+<DownColor>5354225</DownColor>
+<DisabledColor>9539985</DisabledColor>
+<FontData>
+<FontName>Arial</FontName>
+<CharacterSet>204</CharacterSet>
+<Height>-13</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>0</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>SETTINGS</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>379</Top>
+<Bottom>415</Bottom>
+<Left>497</Left>
+<Right>606</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>Settings();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\style1\button.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption>Settings</Caption>
+<Align>1</Align>
+<UpColor>5354225</UpColor>
+<HighlightColor>5354225</HighlightColor>
+<DownColor>5354225</DownColor>
+<DisabledColor>9539985</DisabledColor>
+<FontData>
+<FontName>Arial</FontName>
+<CharacterSet>204</CharacterSet>
+<Height>-13</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>0</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>40</Type>
+<Name>Web</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>15</Top>
+<Bottom>354</Bottom>
+<Left>388</Left>
+<Right>685</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>OnPreload</Name>
+<Args/>
+<Script>--WKE.LoadURL("Web", "https://html5test.com/");</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>2</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnConsole</Name>
+<Args>string e_Message, number e_Level, string e_SourceName, number e_SourceLine, string e_StackTrace</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnAlert</Name>
+<Args>string e_Msg</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnTitleChanged</Name>
+<Args>string e_Title</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnURLChanged</Name>
+<Args>string e_Url</Args>
+<Script>local Url = WKE.GetURL("Web");
+
+local DiscordInvite = String.Find(Url, "#discord_join=", 1, true);
+if(DiscordInvite ~= -1)then
+	local InviteID = string.sub(Url, DiscordInvite+14, String.Length(Url));
+	Shell.Execute("discord:///invite/"..InviteID, "open", "", "", SW_SHOWNORMAL, false);
+end
+
+local OpenURL = String.Find(Url, "#open=", 1, true);
+if(OpenURL ~= -1)then
+	local getURL = string.sub(Url, OpenURL+6, String.Length(Url));
+	Shell.Execute(getURL, "open", "", "", SW_SHOWNORMAL, false);
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnConfirmBox</Name>
+<Args>string e_Msg, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnPromptBox</Name>
+<Args>string e_Msg, string e_DefaultResult, *string e_Result, *bool e_Cancel</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnNavigation</Name>
+<Args>string e_Url, number e_Type, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnDocumentReady</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnDownload</Name>
+<Args>string e_Url, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<PLUGIN>
+<DLLFile>MiniBlink\MiniBlink.apo</DLLFile>
+<CustomData>i</CustomData>
+</PLUGIN>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Object>
+<HGuidelines/>
+<VGuidelines/>
+</Page>
+<Page>
+<Name>style2</Name>
+<InheritObs/>
+<InheritBG/>
+<Description/>
+<Keywords/>
+<Background>
+<Type>2</Type>
+<ImageStyle>0</ImageStyle>
+<TopColor>16711680</TopColor>
+<BottomColor>16711935</BottomColor>
+<UseCustomBackgroundSettings>1</UseCustomBackgroundSettings>
+<TransitionEffect/>
+<TransProps/>
+<NormalImage>
+<Filename>AutoPlay\Images\style2\background.bmp</Filename>
+</NormalImage>
+</Background>
+<Event>
+<Name>On Preload</Name>
+<Args/>
+<Script>Window.SetSize(Application.GetWndHandle(), 734, 670);
+Window.SetText(Application.GetWndHandle(), ServerName);
+Window.SetPos(Application.GetWndHandle(), System.GetDisplayInfo().Width / 2- Window.GetSize(Application.GetWndHandle()).Width / 2, System.GetDisplayInfo().Height / 2 - Window.GetSize(Application.GetWndHandle()).Height / 2);
+
+Transparency();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>3</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Show</Name>
+<Args/>
+<Script>WKE.LoadURL("Web", HostIP.."style2.html");
+
+CheckUpdate();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>34</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Close</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Timer</Name>
+<Args>number e_ID</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Audio</Name>
+<Args>number e_Channel, string e_State</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Size</Name>
+<Args>number e_WindowWidth, number e_WindowHeight, number e_PageWidth, number e_PageHeight, number e_Type</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Menu</Name>
+<Args>number e_ID, table e_ItemInfo</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script>if(e_Key == 116)then
+	WKE.LoadURL("Web", HostIP.."style2.html");
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1</DesignCodeLine>
+<DesignCodeCol>35</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Button</Name>
+<Args>number e_Type, number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Move</Name>
+<Args>number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Wheel</Name>
+<Args>table e_Flags, number e_Delta, number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Object>
+<Type>11</Type>
+<Name>Progress</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>641</Top>
+<Bottom>653</Bottom>
+<Left>28</Left>
+<Right>392</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1918988130</DesignCodeLine>
+<DesignCodeCol>100</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Orientation>0</Orientation>
+<Style>1</Style>
+<XPStyleBars>0</XPStyleBars>
+<Maximum>100</Maximum>
+<Minimum>0</Minimum>
+<Step>10</Step>
+<BarColor format="hex">ffbb2d</BarColor>
+<BackgroundColor format="hex">313541</BackgroundColor>
+<TextColor format="hex">ffc383</TextColor>
+<ProgressText/>
+<UseCustomColours>1</UseCustomColours>
+</Options>
+<Font>
+<FontData>
+<FontName>Calibri</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-11</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Font>
+</Object>
+<Object>
+<Type>2</Type>
+<Name>Status</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>1</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>624</Top>
+<Bottom>653</Bottom>
+<Left>24</Left>
+<Right>397</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1701080175</DesignCodeLine>
+<DesignCodeCol>11890</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1701080175</DesignCodeLine>
+<DesignCodeCol>11890</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1632793699</DesignCodeLine>
+<DesignCodeCol>7301492</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Connecting Patch Server...</Body>
+<NormalColor>2997247</NormalColor>
+<HighlightColor>2997247</HighlightColor>
+<MouseDownColor>2997247</MouseDownColor>
+<DisabledColor>2997247</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Calibri</FontName>
+<CharacterSet>204</CharacterSet>
+<Height>-11</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>START</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>621</Top>
+<Bottom>653</Bottom>
+<Left>398</Left>
+<Right>543</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>local State = Button.GetText(this);
+if(State == "Resume" or State == "Retry")then
+	CheckUpdate();
+elseif(State == "Pause")then
+	ChangeStatus("Paused");
+elseif(State == "Start Game")then
+	LaunchGame();
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>7</DesignCodeLine>
+<DesignCodeCol>3</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\style2\button.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption>Start Game</Caption>
+<Align>1</Align>
+<UpColor>8241115</UpColor>
+<HighlightColor>8241115</HighlightColor>
+<DownColor>8241115</DownColor>
+<DisabledColor>15527148</DisabledColor>
+<FontData>
+<FontName>Sitka Heading</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-16</Height>
+<Weight>700</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>-1</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>SETTINGS</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>621</Top>
+<Bottom>653</Bottom>
+<Left>563</Left>
+<Right>708</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>Settings();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>11</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\style2\button.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption>Settings</Caption>
+<Align>1</Align>
+<UpColor>8241115</UpColor>
+<HighlightColor>8241115</HighlightColor>
+<DownColor>8241115</DownColor>
+<DisabledColor>15527148</DisabledColor>
+<FontData>
+<FontName>Sitka Heading</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-16</Height>
+<Weight>700</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>-1</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>EXIT</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>234</Top>
+<Bottom>253</Bottom>
+<Left>685</Left>
+<Right>704</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>10</Type>
+<Name>Exit/Close</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\style2\button_close.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption/>
+<Align>1</Align>
+<UpColor>16777215</UpColor>
+<HighlightColor>16777215</HighlightColor>
+<DownColor>16777215</DownColor>
+<DisabledColor>16777215</DisabledColor>
+<FontData>
+<FontName>Arial</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-19</Height>
+<Weight>700</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>0</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>40</Type>
+<Name>Web</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>260</Top>
+<Bottom>599</Bottom>
+<Left>399</Left>
+<Right>696</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>OnPreload</Name>
+<Args/>
+<Script>--WKE.LoadURL("Web", "https://html5test.com/");</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>2</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnConsole</Name>
+<Args>string e_Message, number e_Level, string e_SourceName, number e_SourceLine, string e_StackTrace</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnAlert</Name>
+<Args>string e_Msg</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnTitleChanged</Name>
+<Args>string e_Title</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnURLChanged</Name>
+<Args>string e_Url</Args>
+<Script>local Url = WKE.GetURL("Web");
+
+local DiscordInvite = String.Find(Url, "#discord_join=", 1, true);
+if(DiscordInvite ~= -1)then
+	local InviteID = string.sub(Url, DiscordInvite+14, String.Length(Url));
+	Shell.Execute("discord:///invite/"..InviteID, "open", "", "", SW_SHOWNORMAL, false);
+end
+
+local OpenURL = String.Find(Url, "#open=", 1, true);
+if(OpenURL ~= -1)then
+	local getURL = string.sub(Url, OpenURL+6, String.Length(Url));
+	Shell.Execute(getURL, "open", "", "", SW_SHOWNORMAL, false);
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>12</DesignCodeLine>
+<DesignCodeCol>3</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnConfirmBox</Name>
+<Args>string e_Msg, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnPromptBox</Name>
+<Args>string e_Msg, string e_DefaultResult, *string e_Result, *bool e_Cancel</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnNavigation</Name>
+<Args>string e_Url, number e_Type, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnDocumentReady</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnDownload</Name>
+<Args>string e_Url, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<PLUGIN>
+<DLLFile>MiniBlink\MiniBlink.apo</DLLFile>
+<CustomData/>
+</PLUGIN>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Object>
+<HGuidelines/>
+<VGuidelines/>
+</Page>
+<Page>
+<Name>style3</Name>
+<InheritObs/>
+<InheritBG/>
+<Description/>
+<Keywords/>
+<Background>
+<Type>2</Type>
+<ImageStyle>0</ImageStyle>
+<TopColor>16711680</TopColor>
+<BottomColor>16777215</BottomColor>
+<UseCustomBackgroundSettings>1</UseCustomBackgroundSettings>
+<TransitionEffect/>
+<TransProps/>
+<NormalImage>
+<Filename>AutoPlay\Images\style3\background.bmp</Filename>
+</NormalImage>
+</Background>
+<Event>
+<Name>On Preload</Name>
+<Args/>
+<Script>Window.SetSize(Application.GetWndHandle(), 750, 550);
+Window.SetText(Application.GetWndHandle(), ServerName);
+Window.SetPos(Application.GetWndHandle(), System.GetDisplayInfo().Width / 2- Window.GetSize(Application.GetWndHandle()).Width / 2, System.GetDisplayInfo().Height / 2 - Window.GetSize(Application.GetWndHandle()).Height / 2);</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>2</DesignCodeLine>
+<DesignCodeCol>223</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Show</Name>
+<Args/>
+<Script>WKE.LoadURL("Web", HostIP.."style3.html");
+
+CheckUpdate();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>2</DesignCodeLine>
+<DesignCodeCol>1</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Close</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Timer</Name>
+<Args>number e_ID</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Audio</Name>
+<Args>number e_Channel, string e_State</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Size</Name>
+<Args>number e_WindowWidth, number e_WindowHeight, number e_PageWidth, number e_PageHeight, number e_Type</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Menu</Name>
+<Args>number e_ID, table e_ItemInfo</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script>if(e_Key == 116)then
+	WKE.LoadURL("Web", HostIP.."style3.html");
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1</DesignCodeLine>
+<DesignCodeCol>43</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Button</Name>
+<Args>number e_Type, number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Move</Name>
+<Args>number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Wheel</Name>
+<Args>table e_Flags, number e_Delta, number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Object>
+<Type>11</Type>
+<Name>Progress</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>494</Top>
+<Bottom>514</Bottom>
+<Left>37</Left>
+<Right>411</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1918988130</DesignCodeLine>
+<DesignCodeCol>100</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Options>
+<Orientation>0</Orientation>
+<Style>1</Style>
+<XPStyleBars>1</XPStyleBars>
+<Maximum>100</Maximum>
+<Minimum>0</Minimum>
+<Step>10</Step>
+<BarColor format="hex">a1a269</BarColor>
+<BackgroundColor format="hex">000000</BackgroundColor>
+<TextColor format="hex">ffffff</TextColor>
+<ProgressText>Connecting Patch Server...</ProgressText>
+<UseCustomColours>1</UseCustomColours>
+</Options>
+<Font>
+<FontData>
+<FontName>Ebrima</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-11</Height>
+<Weight>700</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+</Font>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>START</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>486</Top>
+<Bottom>523</Bottom>
+<Left>429</Left>
+<Right>575</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>local State = Button.GetText(this);
+if(State == "Resume" or State == "Retry")then
+	CheckUpdate();
+elseif(State == "Pause")then
+	ChangeStatus("Paused");
+elseif(State == "Start Game")then
+	LaunchGame();
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>7</DesignCodeLine>
+<DesignCodeCol>3</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\Style3\button.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption>Start Game</Caption>
+<Align>1</Align>
+<UpColor>5352896</UpColor>
+<HighlightColor>5352896</HighlightColor>
+<DownColor>5352896</DownColor>
+<DisabledColor>9079434</DisabledColor>
+<FontData>
+<FontName>Cambria Math</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-19</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>0</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>SETTINGS</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>486</Top>
+<Bottom>523</Bottom>
+<Left>580</Left>
+<Right>726</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>Settings();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>11</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\Style3\button.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption>Settings</Caption>
+<Align>1</Align>
+<UpColor>5352896</UpColor>
+<HighlightColor>5352896</HighlightColor>
+<DownColor>5352896</DownColor>
+<DisabledColor>9079434</DisabledColor>
+<FontData>
+<FontName>Cambria Math</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-19</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>0</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>EXIT</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>0</Top>
+<Bottom>25</Bottom>
+<Left>723</Left>
+<Right>750</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>10</Type>
+<Name>Exit/Close</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\Style3\button_close.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption/>
+<Align>1</Align>
+<UpColor>16777215</UpColor>
+<HighlightColor>16777215</HighlightColor>
+<DownColor>16777215</DownColor>
+<DisabledColor>16777215</DisabledColor>
+<FontData>
+<FontName>Arial</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-19</Height>
+<Weight>700</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>0</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>40</Type>
+<Name>Web</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>26</Top>
+<Bottom>451</Bottom>
+<Left>12</Left>
+<Right>737</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>OnPreload</Name>
+<Args/>
+<Script>--WKE.LoadURL("Web", "https://html5test.com/");</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>2</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnConsole</Name>
+<Args>string e_Message, number e_Level, string e_SourceName, number e_SourceLine, string e_StackTrace</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnAlert</Name>
+<Args>string e_Msg</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnTitleChanged</Name>
+<Args>string e_Title</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnURLChanged</Name>
+<Args>string e_Url</Args>
+<Script>local Url = WKE.GetURL("Web");
+
+local DiscordInvite = String.Find(Url, "#discord_join=", 1, true);
+if(DiscordInvite ~= -1)then
+	local InviteID = string.sub(Url, DiscordInvite+14, String.Length(Url));
+	Shell.Execute("discord:///invite/"..InviteID, "open", "", "", SW_SHOWNORMAL, false);
+end
+
+local OpenURL = String.Find(Url, "#open=", 1, true);
+if(OpenURL ~= -1)then
+	local getURL = string.sub(Url, OpenURL+6, String.Length(Url));
+	Shell.Execute(getURL, "open", "", "", SW_SHOWNORMAL, false);
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>12</DesignCodeLine>
+<DesignCodeCol>3</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnConfirmBox</Name>
+<Args>string e_Msg, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnPromptBox</Name>
+<Args>string e_Msg, string e_DefaultResult, *string e_Result, *bool e_Cancel</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnNavigation</Name>
+<Args>string e_Url, number e_Type, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnDocumentReady</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnDownload</Name>
+<Args>string e_Url, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<PLUGIN>
+<DLLFile>MiniBlink\MiniBlink.apo</DLLFile>
+<CustomData>ããããããããããããããããããããããããããããããããããããããããããããããããããããèèèèèèèèèèèè···ÛÛÛòòòþþþþþþòòòÛÛÛ···èèèèèèèèèèèèããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããÚÚÚ¼¼¼{{{¼¼¼ÓÓÓÒÒÒÒÒÒÒÒÒÑÑÑÑÑÑÐÐÐÐÐÐÏÏÏÏÏÏÎÎÎÎÎÎÍÍÍÍÍÍÌÌÌÌÌÌ   pppÈÈÈáááããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããããèèèèèèèèèèèè···ÛÛÛòòòþþþþþþòòòÛÛÛ···èèèèèèèèèèèèäääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääãããÐÐÐ™™™ˆˆˆÖÖÖÕÕÕÕÕÕÔÔÔÔÔÔÔÔÔÓÓÓÓÓÓÒÒÒÒÒÒÑÑÑÑÑÑÐÐÐÐÐÐÐÐÐÏÏÏÏÏÏ¶¶¶nnn»»»ÞÞÞääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääéééééééééééé···ÛÛÛòòòþþþþþþòòòÛÛÛ···ééééééééééééääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääääää</CustomData>
+</PLUGIN>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Object>
+<HGuidelines/>
+<VGuidelines/>
+</Page>
+<Page>
+<Name>style4</Name>
+<InheritObs/>
+<InheritBG/>
+<Description/>
+<Keywords/>
+<Background>
+<Type>2</Type>
+<ImageStyle>0</ImageStyle>
+<TopColor>16711680</TopColor>
+<BottomColor>3355443</BottomColor>
+<UseCustomBackgroundSettings>1</UseCustomBackgroundSettings>
+<TransitionEffect/>
+<TransProps/>
+<NormalImage>
+<Filename>AutoPlay\Images\style4\background.png</Filename>
+</NormalImage>
+</Background>
+<Event>
+<Name>On Preload</Name>
+<Args/>
+<Script>Window.SetSize(Application.GetWndHandle(), 710, 745);
+Window.SetText(Application.GetWndHandle(), ServerName);
+Window.SetPos(Application.GetWndHandle(), System.GetDisplayInfo().Width / 2- Window.GetSize(Application.GetWndHandle()).Width / 2, System.GetDisplayInfo().Height / 2 - Window.GetSize(Application.GetWndHandle()).Height / 2);
+
+Transparency();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>3</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Show</Name>
+<Args/>
+<Script>WKE.LoadURL("Web", HostIP.."style4.html");
+
+CheckUpdate();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Close</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Timer</Name>
+<Args>number e_ID</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Audio</Name>
+<Args>number e_Channel, string e_State</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Size</Name>
+<Args>number e_WindowWidth, number e_WindowHeight, number e_PageWidth, number e_PageHeight, number e_Type</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Menu</Name>
+<Args>number e_ID, table e_ItemInfo</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Key</Name>
+<Args>number e_Key, table e_Modifiers</Args>
+<Script>if(e_Key == 116)then
+	WKE.LoadURL("Web", HostIP.."style4.html");
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1</DesignCodeLine>
+<DesignCodeCol>35</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Button</Name>
+<Args>number e_Type, number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Move</Name>
+<Args>number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Mouse Wheel</Name>
+<Args>table e_Flags, number e_Delta, number e_X, number e_Y</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Object>
+<Type>2</Type>
+<Name>Status</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>1</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>681</Top>
+<Bottom>710</Bottom>
+<Left>37</Left>
+<Right>488</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1701080175</DesignCodeLine>
+<DesignCodeCol>11890</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1701080175</DesignCodeLine>
+<DesignCodeCol>11890</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1632793699</DesignCodeLine>
+<DesignCodeCol>7301492</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<Text>
+<Body>Connecting Patch Server...</Body>
+<NormalColor>2997247</NormalColor>
+<HighlightColor>2997247</HighlightColor>
+<MouseDownColor>2997247</MouseDownColor>
+<DisabledColor>2997247</DisabledColor>
+<BorderColor>0</BorderColor>
+<BackColor>16777215</BackColor>
+<FontData>
+<FontName>Calibri</FontName>
+<CharacterSet>204</CharacterSet>
+<Height>-11</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<Alignment>0</Alignment>
+<TransBG>1</TransBG>
+<VSMode>2</VSMode>
+<HSMode>2</HSMode>
+<SBStyle>0</SBStyle>
+<SBSkin/>
+<Border>0</Border>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Text>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>START</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>697</Top>
+<Bottom>727</Bottom>
+<Left>510</Left>
+<Right>596</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>local State = Button.GetText(this);
+if(State == "Resume" or State == "Retry")then
+	CheckUpdate();
+elseif(State == "Pause")then
+	ChangeStatus("Paused");
+elseif(State == "Start Game")then
+	LaunchGame();
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>7</DesignCodeLine>
+<DesignCodeCol>3</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\style4\button.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption>Start Game</Caption>
+<Align>1</Align>
+<UpColor>16777215</UpColor>
+<HighlightColor>16777215</HighlightColor>
+<DownColor>16777215</DownColor>
+<DisabledColor>10066329</DisabledColor>
+<FontData>
+<FontName>Bahnschrift Condensed</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-13</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>0</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>SETTINGS</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>697</Top>
+<Bottom>727</Bottom>
+<Left>605</Left>
+<Right>691</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script>Settings();</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>11</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\style4\button.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption>Settings</Caption>
+<Align>1</Align>
+<UpColor>16777215</UpColor>
+<HighlightColor>16777215</HighlightColor>
+<DownColor>16777215</DownColor>
+<DisabledColor>10066329</DisabledColor>
+<FontData>
+<FontName>Bahnschrift Condensed</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-13</Height>
+<Weight>400</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>0</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>0</Type>
+<Name>EXIT</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>1</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>201</Top>
+<Bottom>217</Bottom>
+<Left>690</Left>
+<Right>706</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>10</Type>
+<Name>Exit/Close</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<BUTTON>
+<Filename>AutoPlay\Buttons\style4\button_close.btn</Filename>
+<Style>0</Style>
+<State>0</State>
+<Caption/>
+<Align>1</Align>
+<UpColor>16777215</UpColor>
+<HighlightColor>16777215</HighlightColor>
+<DownColor>16777215</DownColor>
+<DisabledColor>16777215</DisabledColor>
+<FontData>
+<FontName>Arial</FontName>
+<CharacterSet>0</CharacterSet>
+<Height>-19</Height>
+<Weight>700</Weight>
+<Italic>0</Italic>
+<Underline>0</Underline>
+<StrikeOut>0</StrikeOut>
+<AntiAlias>1</AntiAlias>
+</FontData>
+<CapXOff>0</CapXOff>
+<CapYOff>0</CapYOff>
+<LeftMargin>0</LeftMargin>
+<RightMargin>0</RightMargin>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</BUTTON>
+</Object>
+<Object>
+<Type>3</Type>
+<Name>ProgressBar</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>0</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>1</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>704</Top>
+<Bottom>719</Bottom>
+<Left>36</Left>
+<Right>37</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>On Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>909196613</DesignCodeLine>
+<DesignCodeCol>3678208</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Right-Click</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>15</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Enter</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>1632793699</DesignCodeLine>
+<DesignCodeCol>7301492</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>On Leave</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions>
+<Action>
+<Type>0</Type>
+<Name>None</Name>
+<Exit>0</Exit>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+</Action>
+</Actions>
+<NormalImage>
+<Filename>AutoPlay\Images\style4\ProgressBar.bmp</Filename>
+<UseTransColor>0</UseTransColor>
+<TransClr>16777215</TransClr>
+<TransTolerance>10</TransTolerance>
+<Opacity>100</Opacity>
+<HTMode>0</HTMode>
+</NormalImage>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Object>
+<Object>
+<Type>40</Type>
+<Name>Web</Name>
+<VisibleAtDesignTime>1</VisibleAtDesignTime>
+<VisibleAtRunTime>1</VisibleAtRunTime>
+<Locked>0</Locked>
+<Enabled>1</Enabled>
+<ToolTip/>
+<Cursor>0</Cursor>
+<Group>0</Group>
+<MaintainAspectRatio>0</MaintainAspectRatio>
+<Pin>0</Pin>
+<TabIndex>-1</TabIndex>
+<AutoResize>0</AutoResize>
+<Coordinates>
+<Top>254</Top>
+<Bottom>652</Bottom>
+<Left>31</Left>
+<Right>678</Right>
+</Coordinates>
+<Ratios>
+<WidthRatio>-1.000000</WidthRatio>
+<HeightRatio>-1.000000</HeightRatio>
+</Ratios>
+<Event>
+<Name>OnPreload</Name>
+<Args/>
+<Script>--WKE.LoadURL("Web", "https://html5test.com/");</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>2</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnConsole</Name>
+<Args>string e_Message, number e_Level, string e_SourceName, number e_SourceLine, string e_StackTrace</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnAlert</Name>
+<Args>string e_Msg</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnTitleChanged</Name>
+<Args>string e_Title</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnURLChanged</Name>
+<Args>string e_Url</Args>
+<Script>local Url = WKE.GetURL("Web");
+
+local DiscordInvite = String.Find(Url, "#discord_join=", 1, true);
+if(DiscordInvite ~= -1)then
+	local InviteID = string.sub(Url, DiscordInvite+14, String.Length(Url));
+	Shell.Execute("discord:///invite/"..InviteID, "open", "", "", SW_SHOWNORMAL, false);
+end
+
+local OpenURL = String.Find(Url, "#open=", 1, true);
+if(OpenURL ~= -1)then
+	local getURL = string.sub(Url, OpenURL+6, String.Length(Url));
+	Shell.Execute(getURL, "open", "", "", SW_SHOWNORMAL, false);
+end</Script>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>12</DesignCodeLine>
+<DesignCodeCol>3</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnConfirmBox</Name>
+<Args>string e_Msg, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnPromptBox</Name>
+<Args>string e_Msg, string e_DefaultResult, *string e_Result, *bool e_Cancel</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnNavigation</Name>
+<Args>string e_Url, number e_Type, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnDocumentReady</Name>
+<Args/>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Event>
+<Name>OnDownload</Name>
+<Args>string e_Url, *bool e_Confirm</Args>
+<Script/>
+<TreeStates>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+<TreeState>0</TreeState>
+</TreeStates>
+<DesignCodeLine>0</DesignCodeLine>
+<DesignCodeCol>0</DesignCodeCol>
+<BookMarks count="0">
+</BookMarks>
+</Event>
+<Actions/>
+<PLUGIN>
+<DLLFile>MiniBlink\MiniBlink.apo</DLLFile>
+<CustomData>ääääääääääääääääääääääääääääääääääääéééééééééééé···ÛÛÛòòòþþþþþþòòòÛÛÛ···ééééééééééééååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååäääÓÓÓ£££ÛÛÛÛÛÛÚÚÚÚÚÚÙÙÙÙÙÙØØØØØØ×××××××××ÖÖÖÖÖÖÕÕÕÕÕÕÕÕÕÔÔÔÔÔÔÓÓÓŒŒŒÕÕÕååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååéééééééééééé···ÛÛÛòòòþþþþþþòòòÛÛÛ···ééééééééééééååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååàààÅÅÅ¹¹¹ÞÞÞÝÝÝÝÝÝÜÜÜÜÜÜÜÜÜÛÛÛÛÛÛÚÚÚÚÚÚÙÙÙÙÙÙØØØØØØ××××××ÖÖÖÖÖÖÖÖÖ¢¢¢„„„ÏÏÏååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååååéééééééééééé···ÛÛÛòòòþþþþþþòòòÛÛÛ···êêêêêêêêêêêêææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææææ×××¬¬¬”””Ü</CustomData>
+</PLUGIN>
+<MouseOverSndMode>0</MouseOverSndMode>
+<MouseOverSound/>
+<MouseClickSndMode>0</MouseClickSndMode>
+<MouseClickSound/>
+</Object>
+<HGuidelines/>
+<VGuidelines/>
+</Page>
+<SugDialogs/>
+<MissingTechs>
+<DlgTitle>Missing Technologies</DlgTitle>
+<DlgMsg>This program requires the following technologies which cannot be located on your system.
+
+Please double-click on each item to find out how to install it.</DlgMsg>
+<BtnAbort>Abort</BtnAbort>
+<BtnCancel>Continue</BtnCancel>
+<BtnHelp>Help</BtnHelp>
+<ShowHelpBtn>0</ShowHelpBtn>
+<HelpURL>http://www.yourdomain.com/help.htm</HelpURL>
+</MissingTechs>
+<ProgramPrefs>
+<OutputFolder>C:\Users\nicoh\Documents\AutoPlay Media Studio 8\Output\LastChaos Launcher New (2022)</OutputFolder>
+<EXEName>LC.exe</EXEName>
+<EnableAutoPlayFeatureBTF>0</EnableAutoPlayFeatureBTF>
+<EnableAutoPlayFeatureCDRW>1</EnableAutoPlayFeatureCDRW>
+<EnableAutoPlayFeatureISO>1</EnableAutoPlayFeatureISO>
+<EnableAutoPlayFeatureSFX>0</EnableAutoPlayFeatureSFX>
+<TimeStampFilesBTF>1</TimeStampFilesBTF>
+<TimeStampFilesCDRW>0</TimeStampFilesCDRW>
+<TimeStampFilesISO>0</TimeStampFilesISO>
+<ISOImageFile/>
+<SelfExtractingZIPfile/>
+<ZIPMessage>Loading</ZIPMessage>
+<ZIPShowProgress>1</ZIPShowProgress>
+<CDVolumeIdentifier>NEWDISC</CDVolumeIdentifier>
+<CacheFileData>1</CacheFileData>
+<UseBurnProof>1</UseBurnProof>
+<BuildType>1</BuildType>
+<DriveLetter/>
+<UsePassword>0</UsePassword>
+<OpenFolder>0</OpenFolder>
+<ObscureFilenames>1</ObscureFilenames>
+<ObscureDataFolder>Launcher</ObscureDataFolder>
+</ProgramPrefs>
+</DocumentData>

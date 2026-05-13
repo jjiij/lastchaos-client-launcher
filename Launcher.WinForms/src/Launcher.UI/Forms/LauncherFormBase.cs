@@ -1,0 +1,150 @@
+using Launcher.Core.Contracts;
+using Launcher.Core.Enums;
+using Launcher.Core.Models;
+
+namespace Launcher.UI.Forms;
+
+public abstract class LauncherFormBase : Form
+{
+    protected readonly LauncherSettings Settings;
+    protected readonly IUpdateService UpdateService;
+    protected readonly IRepairService RepairService;
+    protected readonly ISettingsStore SettingsStore;
+    protected readonly IDependencyInstaller DependencyInstaller;
+    protected readonly IGameLauncher GameLauncher;
+    protected readonly IShortcutService ShortcutService;
+
+    protected readonly Label StatusLabel = new() { AutoSize = false, Width = 760, Height = 40, Top = 520, Left = 16 };
+    protected readonly ProgressBar Progress = new() { Left = 16, Top = 560, Width = 760, Height = 20 };
+    protected readonly Button StartButton = new() { Left = 16, Top = 590, Width = 140, Height = 30, Text = "Start Update" };
+    protected readonly Button PauseButton = new() { Left = 166, Top = 590, Width = 140, Height = 30, Text = "Pause" };
+    protected readonly Button RepairButton = new() { Left = 316, Top = 590, Width = 140, Height = 30, Text = "Repair" };
+    protected readonly Button LaunchButton = new() { Left = 466, Top = 590, Width = 140, Height = 30, Text = "Launch" };
+    protected readonly Button SaveButton = new() { Left = 616, Top = 590, Width = 140, Height = 30, Text = "Save Settings" };
+    protected readonly WebBrowser WebPanel = new() { Left = 16, Top = 48, Width = 740, Height = 360, ScriptErrorsSuppressed = true };
+
+    private CancellationTokenSource? _cts;
+
+    protected LauncherFormBase(
+        string title,
+        LauncherSettings settings,
+        IUpdateService updateService,
+        IRepairService repairService,
+        ISettingsStore settingsStore,
+        IDependencyInstaller dependencyInstaller,
+        IGameLauncher gameLauncher,
+        IShortcutService shortcutService)
+    {
+        Text = title;
+        Width = 800;
+        Height = 700;
+
+        Settings = settings;
+        UpdateService = updateService;
+        RepairService = repairService;
+        SettingsStore = settingsStore;
+        DependencyInstaller = dependencyInstaller;
+        GameLauncher = gameLauncher;
+        ShortcutService = shortcutService;
+
+        Controls.AddRange([WebPanel, StatusLabel, Progress, StartButton, PauseButton, RepairButton, LaunchButton, SaveButton]);
+
+        StartButton.Click += async (_, _) => await StartUpdateAsync();
+        PauseButton.Click += (_, _) => TogglePause();
+        RepairButton.Click += async (_, _) => await RunRepairAsync();
+        LaunchButton.Click += async (_, _) => await LaunchGameAsync();
+        SaveButton.Click += async (_, _) => await SaveSettingsAsync();
+        WebPanel.Navigating += OnWebNavigating;
+
+        Load += async (_, _) => await OnLauncherLoadedAsync();
+    }
+
+    private async Task OnLauncherLoadedAsync()
+    {
+        var stylePage = new Uri(new Uri(Settings.HostUrl.TrimEnd('/') + "/"), StyleHtml()).ToString();
+        WebPanel.Navigate(stylePage);
+        await StartUpdateAsync();
+    }
+
+    protected abstract string StyleHtml();
+
+    public void HandleProgress(ProgressSnapshot snapshot)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => HandleProgress(snapshot));
+            return;
+        }
+
+        Progress.Value = Math.Clamp(snapshot.Percent, 0, 100);
+        StatusLabel.Text = $"{snapshot.State}: {snapshot.StatusText} ({snapshot.Percent}%)";
+    }
+
+    private async Task StartUpdateAsync()
+    {
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+        StatusLabel.Text = "Checking updates...";
+        var result = await UpdateService.UpdateGameAndAssetsAsync(_cts.Token);
+        StatusLabel.Text = result.Success ? $"Completed: {result.Message}" : $"Error: {result.Message}";
+
+        if (result.Success && Settings.StartGameAfterUpdate)
+        {
+            await LaunchGameAsync();
+        }
+    }
+
+    private void TogglePause()
+    {
+        if (UpdateService.State == UpdateState.Paused)
+        {
+            UpdateService.Resume();
+            PauseButton.Text = "Pause";
+        }
+        else
+        {
+            UpdateService.Pause();
+            PauseButton.Text = "Resume";
+        }
+    }
+
+    private async Task RunRepairAsync()
+    {
+        var result = await RepairService.VerifyAndRepairAsync();
+        StatusLabel.Text = result.Success
+            ? $"Repair completed ({result.RepairedFiles}/{result.CheckedFiles})"
+            : $"Repair failed: {result.Message}";
+    }
+
+    private async Task LaunchGameAsync()
+    {
+        var ok = await GameLauncher.LaunchAsync(AppContext.BaseDirectory, Settings.NkspLaunchParameter);
+        StatusLabel.Text = ok ? "Game launched" : "Nksp.exe not found";
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        await SettingsStore.SaveAsync(Settings);
+        await ShortcutService.SetRunOnStartupAsync($"LastChaos {Settings.ServerName} Launcher", Application.ExecutablePath, Settings.RunOnStartup);
+        StatusLabel.Text = "Settings saved";
+    }
+
+    private void OnWebNavigating(object? sender, WebBrowserNavigatingEventArgs e)
+    {
+        var url = e.Url?.ToString() ?? string.Empty;
+        if (url.Contains("#discord_join=", StringComparison.OrdinalIgnoreCase))
+        {
+            var invite = url[(url.IndexOf("#discord_join=", StringComparison.OrdinalIgnoreCase) + "#discord_join=".Length)..];
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo($"discord:///invite/{invite}") { UseShellExecute = true });
+            e.Cancel = true;
+            return;
+        }
+
+        if (url.Contains("#open=", StringComparison.OrdinalIgnoreCase))
+        {
+            var open = url[(url.IndexOf("#open=", StringComparison.OrdinalIgnoreCase) + "#open=".Length)..];
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(open) { UseShellExecute = true });
+            e.Cancel = true;
+        }
+    }
+}
