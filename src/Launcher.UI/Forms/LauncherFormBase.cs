@@ -51,14 +51,14 @@ public abstract class LauncherFormBase : Form
         IShortcutService shortcutService)
     {
         Text = title;
-        Width = 1100;
-        Height = 680;
+        Width = 1200;
+        Height = 760;
         AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         DoubleBuffered = true;
         Font = new Font("Segoe UI", 10f);
-        MinimumSize = new Size(980, 640);
+        MinimumSize = new Size(1100, 720);
 
         Settings = settings;
         UpdateService = updateService;
@@ -187,12 +187,13 @@ public abstract class LauncherFormBase : Form
         const int panelInnerPadding = 30;
         const int buttonGap = 10;
         const int buttonHeight = 58;
+        const int actionBottomPadding = 16;
 
         _newsPanel.SetBounds(outerPadding, outerPadding, newsWidth, ClientSize.Height - (outerPadding * 2));
         _newsBox.SetBounds(18, 56, _newsPanel.Width - 36, _newsPanel.Height - 74);
 
         var actionLeft = _newsPanel.Right + panelGap;
-        var actionTop = Math.Max(180, ClientSize.Height - 430);
+        var actionTop = Math.Max(150, ClientSize.Height - 450);
         var actionWidth = ClientSize.Width - actionLeft - outerPadding;
         var actionHeight = ClientSize.Height - actionTop - outerPadding;
         _actionPanel.SetBounds(actionLeft, actionTop, actionWidth, actionHeight);
@@ -222,14 +223,14 @@ public abstract class LauncherFormBase : Form
         y = _assetsProgressLabel.Bottom + 4;
 
         AssetsProgress.SetBounds(30, y, contentWidth, 16);
-        y = AssetsProgress.Bottom + 22;
 
         var secondaryTotal = 3;
         var secondaryWidth = Math.Max(82, (contentWidth - 280 - (buttonGap * 3)) / secondaryTotal);
-        PrimaryButton.SetBounds(30, y, 280, buttonHeight);
-        PauseButton.SetBounds(PrimaryButton.Right + buttonGap, y, secondaryWidth, buttonHeight);
-        RepairButton.SetBounds(PauseButton.Right + buttonGap, y, secondaryWidth, buttonHeight);
-        SaveButton.SetBounds(RepairButton.Right + buttonGap, y, secondaryWidth, buttonHeight);
+        var buttonTop = _actionPanel.Height - buttonHeight - actionBottomPadding;
+        PrimaryButton.SetBounds(30, buttonTop, 280, buttonHeight);
+        PauseButton.SetBounds(PrimaryButton.Right + buttonGap, buttonTop, secondaryWidth, buttonHeight);
+        RepairButton.SetBounds(PauseButton.Right + buttonGap, buttonTop, secondaryWidth, buttonHeight);
+        SaveButton.SetBounds(RepairButton.Right + buttonGap, buttonTop, secondaryWidth, buttonHeight);
     }
 
     private async Task OnPrimaryActionAsync()
