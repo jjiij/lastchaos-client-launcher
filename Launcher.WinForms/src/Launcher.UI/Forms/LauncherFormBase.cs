@@ -56,14 +56,15 @@ public abstract class LauncherFormBase : Form
         SaveButton.Click += async (_, _) => await SaveSettingsAsync();
         WebPanel.Navigating += OnWebNavigating;
 
-        Load += async (_, _) => await OnLauncherLoadedAsync();
+        Load += (_, _) => OnLauncherLoaded();
+        Shown += (_, _) => _ = StartUpdateAsync();
     }
 
-    private async Task OnLauncherLoadedAsync()
+    private void OnLauncherLoaded()
     {
         var stylePage = new Uri(new Uri(Settings.HostUrl.TrimEnd('/') + "/"), StyleHtml()).ToString();
         WebPanel.Navigate(stylePage);
-        await StartUpdateAsync();
+        StatusLabel.Text = "Launcher ready. Checking updates in background...";
     }
 
     protected abstract string StyleHtml();
@@ -85,7 +86,9 @@ public abstract class LauncherFormBase : Form
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
         StatusLabel.Text = "Checking updates...";
-        var result = await UpdateService.UpdateGameAndAssetsAsync(_cts.Token);
+        var result = await Task.Run(
+            async () => await UpdateService.UpdateGameAndAssetsAsync(_cts.Token),
+            _cts.Token);
         StatusLabel.Text = result.Success ? $"Completed: {result.Message}" : $"Error: {result.Message}";
 
         if (result.Success && Settings.StartGameAfterUpdate)

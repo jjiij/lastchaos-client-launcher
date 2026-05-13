@@ -50,6 +50,24 @@ public sealed class UpdateService : IUpdateService
     {
         try
         {
+            State = UpdateState.Checking;
+            var localAssetsVersionFile = Path.Combine(_root, ".assets_version");
+            var localAssetsVersion = File.Exists(localAssetsVersionFile)
+                ? (await File.ReadAllTextAsync(localAssetsVersionFile, cancellationToken)).Trim()
+                : string.Empty;
+            var targetAssetsVersion = _config.AssetsBranch;
+            if (string.Equals(localAssetsVersion, targetAssetsVersion, StringComparison.OrdinalIgnoreCase))
+            {
+                State = UpdateState.Completed;
+                _progress?.Report(new ProgressSnapshot
+                {
+                    State = UpdateState.Completed,
+                    Percent = 100,
+                    StatusText = "Assets already up to date"
+                });
+                return new UpdateOperationResult(true, "Assets already up to date", targetAssetsVersion);
+            }
+
             State = UpdateState.Downloading;
             var zipUrl = $"https://github.com/{_config.AssetsRepo}/archive/refs/heads/{_config.AssetsBranch}.zip";
             var zipPath = Path.Combine(_root, "assets-main.zip");
@@ -122,6 +140,22 @@ public sealed class UpdateService : IUpdateService
             State = UpdateState.Checking;
             var release = await _releaseClient.GetLatestReleaseAsync(_config.GameRepo, cancellationToken);
             var version = string.IsNullOrWhiteSpace(release.TagName) ? release.Name : release.TagName;
+            var localGameVersionFile = Path.Combine(_root, ".client_version");
+            var localGameVersion = File.Exists(localGameVersionFile)
+                ? (await File.ReadAllTextAsync(localGameVersionFile, cancellationToken)).Trim()
+                : string.Empty;
+            if (string.Equals(localGameVersion, version, StringComparison.OrdinalIgnoreCase))
+            {
+                State = UpdateState.Completed;
+                _progress?.Report(new ProgressSnapshot
+                {
+                    State = UpdateState.Completed,
+                    Percent = 100,
+                    StatusText = "Game already up to date"
+                });
+                return new UpdateOperationResult(true, "Game already up to date", version);
+            }
+
             var candidates = SelectGameAssets(release.Assets);
             if (candidates.Count == 0)
             {
