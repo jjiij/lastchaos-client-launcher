@@ -22,16 +22,16 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Restore
-        run: dotnet restore Launcher.WinForms/Launcher.WinForms.sln
+        run: dotnet restore Launcher.WinForms.sln
 
       - name: Build
-        run: dotnet build Launcher.WinForms/Launcher.WinForms.sln --configuration Release --no-restore
+        run: dotnet build Launcher.WinForms.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test Launcher.WinForms/Launcher.WinForms.sln --configuration Release --no-build --verbosity normal
+        run: dotnet test Launcher.WinForms.sln --configuration Release --no-build --verbosity normal
 
       - name: Publish WinForms app
-        run: dotnet publish Launcher.WinForms/src/Launcher.UI/Launcher.UI.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:PublishTrimmed=false -o out/launcher
+        run: dotnet publish src/Launcher.UI/Launcher.UI.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:PublishTrimmed=false -o out/launcher
 
       - name: Package launcher
         shell: powershell

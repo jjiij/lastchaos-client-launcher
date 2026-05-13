@@ -4,11 +4,10 @@ Modern .NET 8 WinForms launcher replacing the legacy AutoPlay project.
 
 ## Repository Layout
 
-- `Launcher.WinForms/`
-  - `src/Launcher.UI` — WinForms application
-  - `src/Launcher.Core` — domain contracts/models
-  - `src/Launcher.Infrastructure` — GitHub updates, download, repair, settings migration
-  - `tests/` — unit + integration tests
+- `src/Launcher.UI` — WinForms application
+- `src/Launcher.Core` — domain contracts/models
+- `src/Launcher.Infrastructure` — GitHub updates, download, repair, settings migration
+- `tests/` — unit + integration tests
 - `.github/workflows/build.yml` — Windows CI build/test/publish/release
 
 ## Features
@@ -26,15 +25,15 @@ Modern .NET 8 WinForms launcher replacing the legacy AutoPlay project.
 ## Build (Windows)
 
 ```powershell
-dotnet restore Launcher.WinForms/Launcher.WinForms.sln
-dotnet build Launcher.WinForms/Launcher.WinForms.sln -c Release
-dotnet test Launcher.WinForms/Launcher.WinForms.sln -c Release
+dotnet restore Launcher.WinForms.sln
+dotnet build Launcher.WinForms.sln -c Release
+dotnet test Launcher.WinForms.sln -c Release
 ```
 
 ## Run
 
 ```powershell
-dotnet run --project Launcher.WinForms/src/Launcher.UI/Launcher.UI.csproj
+dotnet run --project src/Launcher.UI/Launcher.UI.csproj
 ```
 
 ## CLI Arguments
