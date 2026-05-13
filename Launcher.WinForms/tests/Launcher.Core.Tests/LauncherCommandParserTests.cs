@@ -1,5 +1,6 @@
 using Launcher.Core.Enums;
 using Launcher.Core.Services;
+using Xunit;
 
 namespace Launcher.Core.Tests;
 

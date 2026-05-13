@@ -1,4 +1,5 @@
 using Launcher.Infrastructure.Services;
+using Xunit;
 
 namespace Launcher.Integration.Tests;
 
