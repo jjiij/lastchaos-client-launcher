@@ -10,7 +10,7 @@ namespace Launcher.UI;
 internal static class Program
 {
     [STAThread]
-    private static async Task Main(string[] args)
+    private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
         Application.ThreadException += (_, e) => ReportFatal(e.Exception);
@@ -18,52 +18,57 @@ internal static class Program
 
         try
         {
-            var root = AppContext.BaseDirectory;
-            var settingsStore = new JsonSettingsStore(root);
-            var settings = await settingsStore.LoadAsync();
-
-            var command = LauncherCommandParser.Parse(args);
-            var http = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
-            var releaseClient = new GitHubReleaseClient(http);
-            var downloadService = new HttpDownloadService(http);
-
-            var progressBridge = new UiProgressBridge();
-            var updateConfig = new UpdateChannelConfig();
-            var updateService = new UpdateService(root, updateConfig, releaseClient, downloadService, progressBridge);
-            var repairService = new RepairService(root, settings, downloadService, progressBridge);
-            var depInstaller = new DependencyInstaller();
-            var gameLauncher = new GameLauncher();
-            var shortcutService = new WindowsShortcutService();
-
-            if (command.Command == LauncherCommand.ResetSettings)
-            {
-                settings.RunOnStartup = false;
-                settings.StartGameAfterUpdate = false;
-                await settingsStore.SaveAsync(settings);
-                return;
-            }
-
-            if (command.Command == LauncherCommand.InstallDependencies)
-            {
-                var docs = Path.Combine(root, "Launcher", "Docs");
-                await depInstaller.InstallDependenciesAsync(docs);
-                return;
-            }
-
-            if (command.Command == LauncherCommand.CreateList && !string.IsNullOrWhiteSpace(command.Value))
-            {
-                await repairService.CreateChecklistAsync(command.Value!);
-                return;
-            }
-
-            var form = CreateForm(settings, command.Command == LauncherCommand.Dev, updateService, repairService, settingsStore, depInstaller, gameLauncher, shortcutService);
-            progressBridge.Attach(form);
-            Application.Run(form);
+            Run(args).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
             ReportFatal(ex);
         }
+    }
+
+    private static async Task Run(string[] args)
+    {
+        var root = AppContext.BaseDirectory;
+        var settingsStore = new JsonSettingsStore(root);
+        var settings = await settingsStore.LoadAsync();
+
+        var command = LauncherCommandParser.Parse(args);
+        var http = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+        var releaseClient = new GitHubReleaseClient(http);
+        var downloadService = new HttpDownloadService(http);
+
+        var progressBridge = new UiProgressBridge();
+        var updateConfig = new UpdateChannelConfig();
+        var updateService = new UpdateService(root, updateConfig, releaseClient, downloadService, progressBridge);
+        var repairService = new RepairService(root, settings, downloadService, progressBridge);
+        var depInstaller = new DependencyInstaller();
+        var gameLauncher = new GameLauncher();
+        var shortcutService = new WindowsShortcutService();
+
+        if (command.Command == LauncherCommand.ResetSettings)
+        {
+            settings.RunOnStartup = false;
+            settings.StartGameAfterUpdate = false;
+            await settingsStore.SaveAsync(settings);
+            return;
+        }
+
+        if (command.Command == LauncherCommand.InstallDependencies)
+        {
+            var docs = Path.Combine(root, "Launcher", "Docs");
+            await depInstaller.InstallDependenciesAsync(docs);
+            return;
+        }
+
+        if (command.Command == LauncherCommand.CreateList && !string.IsNullOrWhiteSpace(command.Value))
+        {
+            await repairService.CreateChecklistAsync(command.Value!);
+            return;
+        }
+
+        var form = CreateForm(settings, command.Command == LauncherCommand.Dev, updateService, repairService, settingsStore, depInstaller, gameLauncher, shortcutService);
+        progressBridge.Attach(form);
+        Application.Run(form);
     }
 
     private static LauncherFormBase CreateForm(
