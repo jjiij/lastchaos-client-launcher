@@ -16,26 +16,26 @@ public abstract class LauncherFormBase : Form
     protected readonly IGameLauncher GameLauncher;
     protected readonly IShortcutService ShortcutService;
 
-    private readonly Panel _newsPanel = new() { Left = 24, Top = 24, Width = 360, Height = 500, Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left };
-    private readonly Label _newsTitle = new() { Left = 18, Top = 16, Width = 320, Height = 30, Text = "NEWS", ForeColor = Color.White, Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold) };
-    private readonly RichTextBox _newsBox = new() { Left = 18, Top = 56, Width = 324, Height = 420, ReadOnly = true, BorderStyle = BorderStyle.None };
+    private readonly Panel _newsPanel = new() { Left = 24, Top = 24, Width = 390, Height = 560, Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left };
+    private readonly Label _newsTitle = new() { Left = 18, Top = 16, Width = 340, Height = 36, Text = "NEWS", ForeColor = Color.White, Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold) };
+    private readonly RichTextBox _newsBox = new() { Left = 18, Top = 56, Width = 354, Height = 486, ReadOnly = true, BorderStyle = BorderStyle.None };
 
-    private readonly Panel _actionPanel = new() { Left = 410, Top = 260, Width = 540, Height = 320, Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
-    private readonly Label _title = new() { Left = 28, Top = 16, Width = 490, Height = 52, Text = "LASTCHAOS", ForeColor = Color.White, Font = new Font("Segoe UI Black", 20f, FontStyle.Bold) };
-    private readonly Label _subtitle = new() { Left = 30, Top = 60, Width = 470, Height = 24, Text = "Modern launcher / legacy-compatible", ForeColor = Color.FromArgb(190, 220, 255), Font = new Font("Segoe UI", 10f, FontStyle.Regular) };
+    private readonly Panel _actionPanel = new() { Left = 430, Top = 230, Width = 620, Height = 354, Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
+    private readonly Label _title = new() { Left = 28, Top = 16, Width = 560, Height = 56, Text = "LASTCHAOS", ForeColor = Color.White, Font = new Font("Segoe UI Black", 24f, FontStyle.Bold) };
+    private readonly Label _subtitle = new() { Left = 30, Top = 74, Width = 560, Height = 26, Text = "Modern launcher / legacy-compatible", ForeColor = Color.FromArgb(190, 220, 255), Font = new Font("Segoe UI", 11f, FontStyle.Regular) };
 
-    protected readonly Label StatusLabel = new() { Left = 30, Top = 96, Width = 490, Height = 34, ForeColor = Color.White, BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 10.5f, FontStyle.Bold) };
-    private readonly Label _downloadDetailsLabel = new() { Left = 30, Top = 126, Width = 490, Height = 22, ForeColor = Color.FromArgb(197, 206, 231), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Regular), Text = "No active download." };
-    private readonly Label _gameProgressLabel = new() { Left = 30, Top = 154, Width = 220, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
-    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 198, Width = 220, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+    protected readonly Label StatusLabel = new() { Left = 30, Top = 110, Width = 560, Height = 34, ForeColor = Color.White, BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 11f, FontStyle.Bold) };
+    private readonly Label _downloadDetailsLabel = new() { Left = 30, Top = 142, Width = 560, Height = 24, ForeColor = Color.FromArgb(197, 206, 231), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9.5f, FontStyle.Regular), Text = "No active download." };
+    private readonly Label _gameProgressLabel = new() { Left = 30, Top = 174, Width = 260, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 222, Width = 260, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
 
-    protected readonly ProgressBar GameProgress = new() { Left = 30, Top = 174, Width = 488, Height = 14, Style = ProgressBarStyle.Continuous };
-    protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 218, Width = 488, Height = 14, Style = ProgressBarStyle.Continuous };
+    protected readonly ProgressBar GameProgress = new() { Left = 30, Top = 194, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous };
+    protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 242, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous };
 
-    protected readonly Button PrimaryButton = new() { Left = 30, Top = 250, Width = 250, Height = 52, Text = "Download / Update", Font = new Font("Segoe UI", 12f, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
-    protected readonly Button PauseButton = new() { Left = 292, Top = 250, Width = 70, Height = 52, Text = "Pause", FlatStyle = FlatStyle.Flat };
-    protected readonly Button RepairButton = new() { Left = 372, Top = 250, Width = 70, Height = 52, Text = "Repair", FlatStyle = FlatStyle.Flat };
-    protected readonly Button SaveButton = new() { Left = 452, Top = 250, Width = 66, Height = 52, Text = "Save", FlatStyle = FlatStyle.Flat };
+    protected readonly Button PrimaryButton = new() { Left = 30, Top = 282, Width = 320, Height = 58, Text = "Download / Update", Font = new Font("Segoe UI", 13f, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
+    protected readonly Button PauseButton = new() { Left = 362, Top = 282, Width = 74, Height = 58, Text = "Pause", FlatStyle = FlatStyle.Flat };
+    protected readonly Button RepairButton = new() { Left = 446, Top = 282, Width = 74, Height = 58, Text = "Repair", FlatStyle = FlatStyle.Flat };
+    protected readonly Button SaveButton = new() { Left = 530, Top = 282, Width = 60, Height = 58, Text = "Save", FlatStyle = FlatStyle.Flat };
 
     private CancellationTokenSource? _cts;
     private bool _isUpdating;
@@ -51,8 +51,8 @@ public abstract class LauncherFormBase : Form
         IShortcutService shortcutService)
     {
         Text = title;
-        Width = 1000;
-        Height = 650;
+        Width = 1100;
+        Height = 680;
         AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
@@ -144,6 +144,8 @@ public abstract class LauncherFormBase : Form
         _newsBox.BackColor = Color.FromArgb(19, 24, 37);
         _newsBox.ForeColor = Color.FromArgb(224, 234, 255);
         _newsBox.Font = new Font("Segoe UI", 10f);
+        _newsBox.ScrollBars = RichTextBoxScrollBars.Vertical;
+        _newsBox.WordWrap = true;
 
         StyleButton(PrimaryButton, Color.FromArgb(50, 156, 255), Color.White);
         StyleButton(PauseButton, Color.FromArgb(47, 59, 86), Color.White);
