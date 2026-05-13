@@ -24,9 +24,9 @@ public abstract class LauncherFormBase : Form
     private readonly Label _title = new() { Left = 28, Top = 16, Width = 470, Height = 40, Text = "LASTCHAOS", ForeColor = Color.White, Font = new Font("Segoe UI Black", 24f, FontStyle.Bold) };
     private readonly Label _subtitle = new() { Left = 30, Top = 60, Width = 470, Height = 24, Text = "Modern launcher / legacy-compatible", ForeColor = Color.FromArgb(190, 220, 255), Font = new Font("Segoe UI", 10f, FontStyle.Regular) };
 
-    protected readonly Label StatusLabel = new() { Left = 30, Top = 96, Width = 490, Height = 34, ForeColor = Color.White, Font = new Font("Segoe UI", 10.5f, FontStyle.Bold) };
-    private readonly Label _gameProgressLabel = new() { Left = 30, Top = 132, Width = 220, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
-    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 176, Width = 220, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+    protected readonly Label StatusLabel = new() { Left = 30, Top = 96, Width = 490, Height = 34, ForeColor = Color.White, BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 10.5f, FontStyle.Bold) };
+    private readonly Label _gameProgressLabel = new() { Left = 30, Top = 132, Width = 220, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 176, Width = 220, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
 
     protected readonly ProgressBar GameProgress = new() { Left = 30, Top = 152, Width = 488, Height = 14, Style = ProgressBarStyle.Continuous };
     protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 196, Width = 488, Height = 14, Style = ProgressBarStyle.Continuous };
@@ -135,10 +135,10 @@ public abstract class LauncherFormBase : Form
 
     private void ConfigureTheme()
     {
-        _newsPanel.BackColor = Color.FromArgb(145, 6, 10, 20);
-        _actionPanel.BackColor = Color.FromArgb(155, 6, 10, 20);
+        _newsPanel.BackColor = Color.FromArgb(19, 24, 37);
+        _actionPanel.BackColor = Color.FromArgb(12, 16, 28);
 
-        _newsBox.BackColor = Color.FromArgb(0, 0, 0, 0);
+        _newsBox.BackColor = Color.FromArgb(19, 24, 37);
         _newsBox.ForeColor = Color.FromArgb(224, 234, 255);
         _newsBox.Font = new Font("Segoe UI", 10f);
 
