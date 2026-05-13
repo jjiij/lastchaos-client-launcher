@@ -21,7 +21,9 @@ public abstract class LauncherFormBase : Form
     protected readonly Button RepairButton = new() { Left = 316, Top = 590, Width = 140, Height = 30, Text = "Repair" };
     protected readonly Button LaunchButton = new() { Left = 466, Top = 590, Width = 140, Height = 30, Text = "Launch" };
     protected readonly Button SaveButton = new() { Left = 616, Top = 590, Width = 140, Height = 30, Text = "Save Settings" };
-    protected readonly WebBrowser WebPanel = new() { Left = 16, Top = 48, Width = 740, Height = 360, ScriptErrorsSuppressed = true };
+    protected readonly Panel WebPanel = new() { Left = 16, Top = 48, Width = 740, Height = 360, BorderStyle = BorderStyle.FixedSingle };
+    protected readonly Label WebPlaceholder = new() { Left = 24, Top = 56, Width = 724, Height = 28, Text = "Embedded web panel disabled in this build. Open style page in your browser:", AutoSize = false };
+    protected readonly LinkLabel WebLink = new() { Left = 24, Top = 84, Width = 724, Height = 24, AutoSize = false };
 
     private CancellationTokenSource? _cts;
 
@@ -47,14 +49,14 @@ public abstract class LauncherFormBase : Form
         GameLauncher = gameLauncher;
         ShortcutService = shortcutService;
 
-        Controls.AddRange([WebPanel, StatusLabel, Progress, StartButton, PauseButton, RepairButton, LaunchButton, SaveButton]);
+        Controls.AddRange([WebPanel, WebPlaceholder, WebLink, StatusLabel, Progress, StartButton, PauseButton, RepairButton, LaunchButton, SaveButton]);
 
         StartButton.Click += async (_, _) => await StartUpdateAsync();
         PauseButton.Click += (_, _) => TogglePause();
         RepairButton.Click += async (_, _) => await RunRepairAsync();
         LaunchButton.Click += async (_, _) => await LaunchGameAsync();
         SaveButton.Click += async (_, _) => await SaveSettingsAsync();
-        WebPanel.Navigating += OnWebNavigating;
+        WebLink.LinkClicked += OnWebLinkClicked;
 
         Load += (_, _) => OnLauncherLoaded();
         Shown += (_, _) => _ = StartUpdateAsync();
@@ -63,10 +65,7 @@ public abstract class LauncherFormBase : Form
     private void OnLauncherLoaded()
     {
         var stylePage = BuildSafeStyleUrl();
-        if (!string.IsNullOrWhiteSpace(stylePage))
-        {
-            WebPanel.Navigate(stylePage);
-        }
+        WebLink.Text = stylePage;
         StatusLabel.Text = "Launcher ready. Checking updates in background...";
     }
 
@@ -135,14 +134,18 @@ public abstract class LauncherFormBase : Form
         StatusLabel.Text = "Settings saved";
     }
 
-    private void OnWebNavigating(object? sender, WebBrowserNavigatingEventArgs e)
+    private void OnWebLinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
     {
-        var url = e.Url?.ToString() ?? string.Empty;
+        var url = WebLink.Text ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return;
+        }
+
         if (url.Contains("#discord_join=", StringComparison.OrdinalIgnoreCase))
         {
             var invite = url[(url.IndexOf("#discord_join=", StringComparison.OrdinalIgnoreCase) + "#discord_join=".Length)..];
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo($"discord:///invite/{invite}") { UseShellExecute = true });
-            e.Cancel = true;
             return;
         }
 
@@ -150,8 +153,10 @@ public abstract class LauncherFormBase : Form
         {
             var open = url[(url.IndexOf("#open=", StringComparison.OrdinalIgnoreCase) + "#open=".Length)..];
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(open) { UseShellExecute = true });
-            e.Cancel = true;
+            return;
         }
+
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
     }
 
     private string BuildSafeStyleUrl()
