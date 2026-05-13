@@ -17,17 +17,17 @@ public abstract class LauncherFormBase : Form
     protected readonly IShortcutService ShortcutService;
 
     private readonly Panel _newsPanel = new() { Left = 24, Top = 24, Width = 390, Height = 560, Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left };
-    private readonly Label _newsTitle = new() { Left = 18, Top = 16, Width = 340, Height = 36, Text = "NEWS", ForeColor = Color.White, Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold) };
+    private readonly Label _newsTitle = new() { Left = 18, Top = 16, Width = 340, Height = 36, Text = "NEWS", ForeColor = Color.White, Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold), AutoSize = true };
     private readonly RichTextBox _newsBox = new() { Left = 18, Top = 56, Width = 354, Height = 486, ReadOnly = true, BorderStyle = BorderStyle.None };
 
-    private readonly Panel _actionPanel = new() { Left = 430, Top = 220, Width = 620, Height = 380, Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
-    private readonly Label _title = new() { Left = 28, Top = 16, Width = 560, Height = 52, Text = "LASTCHAOS", ForeColor = Color.White, Font = new Font("Segoe UI Black", 22f, FontStyle.Bold) };
-    private readonly Label _subtitle = new() { Left = 30, Top = 72, Width = 560, Height = 24, Text = "Modern launcher / legacy-compatible", ForeColor = Color.FromArgb(190, 220, 255), Font = new Font("Segoe UI", 11f, FontStyle.Regular) };
+    private readonly Panel _actionPanel = new() { Left = 430, Top = 200, Width = 620, Height = 400, Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };
+    private readonly Label _title = new() { Left = 28, Top = 16, Width = 560, Height = 52, Text = "LASTCHAOS", ForeColor = Color.White, Font = new Font("Segoe UI Black", 22f, FontStyle.Bold), AutoSize = true };
+    private readonly Label _subtitle = new() { Left = 30, Top = 72, Width = 560, Height = 24, Text = "Modern launcher / legacy-compatible", ForeColor = Color.FromArgb(190, 220, 255), Font = new Font("Segoe UI", 11f, FontStyle.Regular), AutoSize = true };
 
-    protected readonly Label StatusLabel = new() { Left = 30, Top = 112, Width = 560, Height = 34, ForeColor = Color.White, BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 11f, FontStyle.Bold) };
-    private readonly Label _downloadDetailsLabel = new() { Left = 30, Top = 146, Width = 560, Height = 24, ForeColor = Color.FromArgb(197, 206, 231), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9.5f, FontStyle.Regular), Text = "No active download." };
-    private readonly Label _gameProgressLabel = new() { Left = 30, Top = 178, Width = 260, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
-    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 228, Width = 260, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+    protected readonly Label StatusLabel = new() { Left = 30, Top = 112, Width = 560, Height = 34, ForeColor = Color.White, BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 11f, FontStyle.Bold), AutoSize = true };
+    private readonly Label _downloadDetailsLabel = new() { Left = 30, Top = 146, Width = 560, Height = 24, ForeColor = Color.FromArgb(197, 206, 231), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9.5f, FontStyle.Regular), Text = "No active download.", AutoSize = true };
+    private readonly Label _gameProgressLabel = new() { Left = 30, Top = 178, Width = 260, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true };
+    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 228, Width = 260, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true };
 
     protected readonly ProgressBar GameProgress = new() { Left = 30, Top = 200, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous };
     protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 250, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous };
@@ -58,6 +58,7 @@ public abstract class LauncherFormBase : Form
         MaximizeBox = false;
         DoubleBuffered = true;
         Font = new Font("Segoe UI", 10f);
+        MinimumSize = new Size(980, 640);
 
         Settings = settings;
         UpdateService = updateService;
@@ -93,6 +94,7 @@ public abstract class LauncherFormBase : Form
         SaveButton.Click += async (_, _) => await SaveSettingsAsync();
 
         Load += (_, _) => OnLauncherLoaded();
+        Resize += (_, _) => ApplyResponsiveLayout();
     }
 
     protected abstract string StyleHtml();
@@ -171,9 +173,63 @@ public abstract class LauncherFormBase : Form
     private void OnLauncherLoaded()
     {
         ApplySkinBackground();
+        ApplyResponsiveLayout();
         LoadNews();
         UpdatePrimaryButtonLabel();
         StatusLabel.Text = "Launcher ready. Checking updates in background...";
+    }
+
+    private void ApplyResponsiveLayout()
+    {
+        const int outerPadding = 24;
+        const int panelGap = 16;
+        const int newsWidth = 390;
+        const int panelInnerPadding = 30;
+        const int buttonGap = 10;
+        const int buttonHeight = 58;
+
+        _newsPanel.SetBounds(outerPadding, outerPadding, newsWidth, ClientSize.Height - (outerPadding * 2));
+        _newsBox.SetBounds(18, 56, _newsPanel.Width - 36, _newsPanel.Height - 74);
+
+        var actionLeft = _newsPanel.Right + panelGap;
+        var actionTop = Math.Max(180, ClientSize.Height - 430);
+        var actionWidth = ClientSize.Width - actionLeft - outerPadding;
+        var actionHeight = ClientSize.Height - actionTop - outerPadding;
+        _actionPanel.SetBounds(actionLeft, actionTop, actionWidth, actionHeight);
+
+        var contentWidth = _actionPanel.Width - (panelInnerPadding * 2);
+        var y = 16;
+
+        _title.Location = new Point(30, y);
+        y = _title.Bottom + 4;
+
+        _subtitle.Location = new Point(30, y);
+        y = _subtitle.Bottom + 12;
+
+        StatusLabel.Location = new Point(30, y);
+        y = StatusLabel.Bottom + 6;
+
+        _downloadDetailsLabel.Location = new Point(30, y);
+        y = _downloadDetailsLabel.Bottom + 10;
+
+        _gameProgressLabel.Location = new Point(30, y);
+        y = _gameProgressLabel.Bottom + 4;
+
+        GameProgress.SetBounds(30, y, contentWidth, 16);
+        y = GameProgress.Bottom + 10;
+
+        _assetsProgressLabel.Location = new Point(30, y);
+        y = _assetsProgressLabel.Bottom + 4;
+
+        AssetsProgress.SetBounds(30, y, contentWidth, 16);
+        y = AssetsProgress.Bottom + 22;
+
+        var secondaryTotal = 3;
+        var secondaryWidth = Math.Max(82, (contentWidth - 280 - (buttonGap * 3)) / secondaryTotal);
+        PrimaryButton.SetBounds(30, y, 280, buttonHeight);
+        PauseButton.SetBounds(PrimaryButton.Right + buttonGap, y, secondaryWidth, buttonHeight);
+        RepairButton.SetBounds(PauseButton.Right + buttonGap, y, secondaryWidth, buttonHeight);
+        SaveButton.SetBounds(RepairButton.Right + buttonGap, y, secondaryWidth, buttonHeight);
     }
 
     private async Task OnPrimaryActionAsync()
