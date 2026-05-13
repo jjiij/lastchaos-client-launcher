@@ -25,7 +25,7 @@ public abstract class LauncherFormBase : Form
     private readonly Label _subtitle = new() { Left = 30, Top = 72, Width = 560, Height = 24, Text = "Modern launcher / legacy-compatible", ForeColor = Color.FromArgb(190, 220, 255), Font = new Font("Segoe UI", 11f, FontStyle.Regular), AutoSize = true };
 
     protected readonly Label StatusLabel = new() { Left = 30, Top = 112, Width = 560, Height = 34, ForeColor = Color.White, BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 11f, FontStyle.Bold), AutoSize = true };
-    private readonly Label _downloadDetailsLabel = new() { Left = 30, Top = 146, Width = 560, Height = 24, ForeColor = Color.FromArgb(197, 206, 231), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9.5f, FontStyle.Regular), Text = "No active download.", AutoSize = true };
+    private readonly Label _downloadDetailsLabel = new() { Left = 30, Top = 146, Width = 560, Height = 44, ForeColor = Color.FromArgb(197, 206, 231), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9.5f, FontStyle.Regular), Text = "No active download.", AutoSize = false };
     private readonly Label _gameProgressLabel = new() { Left = 30, Top = 178, Width = 260, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true };
     private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 228, Width = 260, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true };
 
@@ -455,7 +455,18 @@ public abstract class LauncherFormBase : Form
         var speed = snapshot.SpeedBytesPerSecond > 0
             ? $"{FormatBytes((long)snapshot.SpeedBytesPerSecond)}/s"
             : "0 B/s";
-        return $"{snapshot.StatusText} | {transferred} / {total} | {speed}";
+        var summary = $"{transferred}/{total}    {speed}    Progress {snapshot.Percent}%";
+
+        const string prefix = "Downloading ";
+        var fileName = snapshot.StatusText.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? snapshot.StatusText[prefix.Length..].Trim()
+            : snapshot.StatusText.Trim();
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return summary;
+        }
+
+        return $"{summary}\n{fileName}";
     }
 
     private static string FormatBytes(long bytes)
