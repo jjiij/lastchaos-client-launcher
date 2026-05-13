@@ -35,3 +35,7 @@ dotnet run --project src/Launcher.UI/Launcher.UI.csproj
 - New canonical: `launcher.settings.json`
 - Legacy compatibility: `lccnct.dta`, `sl.dta`, `vtm.brn`
 - Version markers: `.client_version`, `.assets_version`, `.launcher_version`
+
+## Runtime Requirement
+
+- Release artifacts are published as **self-contained win-x64** binaries (single-file), so end users do **not** need to install .NET separately.
