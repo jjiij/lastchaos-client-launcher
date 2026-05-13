@@ -14,6 +14,11 @@ public sealed class DependencyInstaller : IDependencyInstaller
 
     public async Task<bool> InstallDependenciesAsync(string launcherRootPath, CancellationToken cancellationToken = default)
     {
+        if (HasRuntimeDllsInBin(launcherRootPath))
+        {
+            return true;
+        }
+
         if (TryDeployBundledRuntimeDlls(launcherRootPath))
         {
             return true;
@@ -32,6 +37,16 @@ public sealed class DependencyInstaller : IDependencyInstaller
 
         vc ??= await DownloadInstallerAsync(Vc2010X86Url, Path.Combine(cacheRoot, "vcredist_x86.exe"), cancellationToken);
         dx ??= await DownloadInstallerAsync(DirectXWebUrl, Path.Combine(cacheRoot, "dxwebsetup.exe"), cancellationToken);
+
+        // Prefer no-admin path: extract runtime DLLs from the downloaded VC installer
+        // and deploy them app-local into Bin/.
+        if (!string.IsNullOrWhiteSpace(vc) && File.Exists(vc))
+        {
+            if (await TryExtractVcRuntimeDllsAsync(vc, launcherRootPath, cacheRoot, cancellationToken))
+            {
+                return true;
+            }
+        }
 
         var ranAnyInstaller = false;
         var ok = true;
@@ -166,5 +181,82 @@ public sealed class DependencyInstaller : IDependencyInstaller
     {
         var binDir = Path.Combine(launcherRootPath, "Bin");
         return RequiredRuntimeDlls.All(name => File.Exists(Path.Combine(binDir, name)));
+    }
+
+    private static async Task<bool> TryExtractVcRuntimeDllsAsync(
+        string vcInstallerPath,
+        string launcherRootPath,
+        string cacheRoot,
+        CancellationToken cancellationToken)
+    {
+        var extractDir = Path.Combine(cacheRoot, "vc-extract");
+        if (Directory.Exists(extractDir))
+        {
+            Directory.Delete(extractDir, recursive: true);
+        }
+        Directory.CreateDirectory(extractDir);
+
+        // VS2010 redist supports extraction without installation.
+        var extracted = await RunProcessAsync(
+            vcInstallerPath,
+            $"/extract:\"{extractDir}\" /q",
+            useShellExecute: false,
+            runAsAdmin: false,
+            cancellationToken: cancellationToken);
+
+        if (!extracted)
+        {
+            return false;
+        }
+
+        var binDir = Path.Combine(launcherRootPath, "Bin");
+        Directory.CreateDirectory(binDir);
+
+        foreach (var dllName in RequiredRuntimeDlls)
+        {
+            var source = Directory
+                .EnumerateFiles(extractDir, dllName, SearchOption.AllDirectories)
+                .FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                continue;
+            }
+
+            var target = Path.Combine(binDir, dllName);
+            File.Copy(source, target, overwrite: true);
+        }
+
+        return HasRuntimeDllsInBin(launcherRootPath);
+    }
+
+    private static async Task<bool> RunProcessAsync(
+        string executablePath,
+        string args,
+        bool useShellExecute,
+        bool runAsAdmin,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo(executablePath, args)
+            {
+                UseShellExecute = useShellExecute
+            };
+
+            if (runAsAdmin && useShellExecute)
+            {
+                startInfo.Verb = "runas";
+            }
+
+            using var process = new Process { StartInfo = startInfo };
+            process.Start();
+            await process.WaitForExitAsync(cancellationToken);
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
