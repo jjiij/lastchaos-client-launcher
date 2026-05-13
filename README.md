@@ -47,3 +47,4 @@ dotnet run --project src/Launcher.UI/Launcher.UI.csproj
 
 - Legacy AutoPlay assets/source were intentionally removed from this repository.
 - This repository now tracks only the WinForms launcher codebase.
+- For no-admin launches, place `msvcp100.dll` and `msvcr100.dll` in `src/Launcher.UI/runtime-dlls/`; the launcher will copy them into `Bin/` automatically before starting the game.

@@ -15,4 +15,10 @@
     <ProjectReference Include="..\Launcher.Core\Launcher.Core.csproj" />
     <ProjectReference Include="..\Launcher.Infrastructure\Launcher.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="runtime-dlls\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>
