@@ -44,7 +44,12 @@ public sealed class RepairService : IRepairService
     {
         try
         {
-            var checklistUrl = new Uri(new Uri(_settings.HostUrl.TrimEnd('/') + "/"), "client/checklist.txt").ToString();
+            if (!TryGetBaseHostUri(out var baseUri))
+            {
+                return new RepairOperationResult(false, "Invalid HostUrl in launcher settings.");
+            }
+
+            var checklistUrl = new Uri(baseUri, "client/checklist.txt").ToString();
             var tmpChecklist = Path.Combine(_root, "_remote_checklist.txt");
             await _downloadService.DownloadAsync(checklistUrl, tmpChecklist, _progress, cancellationToken);
 
@@ -73,7 +78,7 @@ public sealed class RepairService : IRepairService
 
                 if (valid) continue;
 
-                var fileUrl = new Uri(new Uri(_settings.HostUrl.TrimEnd('/') + "/"), "client/" + parts[1].Trim().Replace('\\', '/')).ToString();
+                var fileUrl = new Uri(baseUri, "client/" + parts[1].Trim().Replace('\\', '/')).ToString();
                 Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
                 await _downloadService.DownloadAsync(fileUrl, localPath, _progress, cancellationToken);
                 repairedFiles++;
@@ -86,5 +91,24 @@ public sealed class RepairService : IRepairService
         {
             return new RepairOperationResult(false, ex.Message);
         }
+    }
+
+    private bool TryGetBaseHostUri(out Uri baseUri)
+    {
+        var host = (_settings.HostUrl ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            baseUri = null!;
+            return false;
+        }
+
+        if (!host.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !host.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            host = "https://" + host;
+        }
+
+        if (!host.EndsWith("/")) host += "/";
+        return Uri.TryCreate(host, UriKind.Absolute, out baseUri!);
     }
 }

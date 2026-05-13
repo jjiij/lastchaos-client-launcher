@@ -62,8 +62,11 @@ public abstract class LauncherFormBase : Form
 
     private void OnLauncherLoaded()
     {
-        var stylePage = new Uri(new Uri(Settings.HostUrl.TrimEnd('/') + "/"), StyleHtml()).ToString();
-        WebPanel.Navigate(stylePage);
+        var stylePage = BuildSafeStyleUrl();
+        if (!string.IsNullOrWhiteSpace(stylePage))
+        {
+            WebPanel.Navigate(stylePage);
+        }
         StatusLabel.Text = "Launcher ready. Checking updates in background...";
     }
 
@@ -149,5 +152,32 @@ public abstract class LauncherFormBase : Form
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(open) { UseShellExecute = true });
             e.Cancel = true;
         }
+    }
+
+    private string BuildSafeStyleUrl()
+    {
+        var host = (Settings.HostUrl ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            return "about:blank";
+        }
+
+        if (!host.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !host.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            host = "https://" + host;
+        }
+
+        if (!host.EndsWith("/"))
+        {
+            host += "/";
+        }
+
+        if (!Uri.TryCreate(host, UriKind.Absolute, out var baseUri))
+        {
+            return "about:blank";
+        }
+
+        return new Uri(baseUri, StyleHtml()).ToString();
     }
 }
