@@ -313,29 +313,17 @@ public abstract class LauncherFormBase : Form
     {
         if (!HasVc100Runtime())
         {
-            var installPrompt = MessageBox.Show(
-                "Required runtime files (MSVCP100/MSVCR100) are missing.\n\nInstall dependencies now?",
-                "Install Dependencies",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
-
-            if (installPrompt == DialogResult.Yes)
+            StatusLabel.Text = "Installing required runtime dependencies...";
+            _downloadDetailsLabel.Text = "Preparing VC++/DirectX prerequisites.";
+            var installOk = await DependencyInstaller.InstallDependenciesAsync(AppContext.BaseDirectory);
+            if (!installOk || !HasVc100Runtime())
             {
-                StatusLabel.Text = "Installing VC++/DirectX dependencies...";
-                _downloadDetailsLabel.Text = "UAC prompt may appear.";
-                var installOk = await DependencyInstaller.InstallDependenciesAsync(AppContext.BaseDirectory);
-                if (!installOk)
-                {
-                    StatusLabel.Text = "Dependency install failed or was cancelled";
-                    _downloadDetailsLabel.Text = "Run launcher as admin and retry.";
-                    return;
-                }
-            }
-            else
-            {
-                StatusLabel.Text = "Cannot launch without required runtime";
+                StatusLabel.Text = "Dependency install failed";
+                _downloadDetailsLabel.Text = "Could not install VC++ 2010 runtime automatically.";
                 return;
             }
+
+            _downloadDetailsLabel.Text = "Dependencies installed.";
         }
 
         var ok = await GameLauncher.LaunchAsync(AppContext.BaseDirectory, Settings.NkspLaunchParameter);
