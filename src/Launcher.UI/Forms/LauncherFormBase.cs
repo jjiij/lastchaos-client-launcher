@@ -27,7 +27,7 @@ public abstract class LauncherFormBase : Form
     protected readonly Label StatusLabel = new() { Left = 30, Top = 112, Width = 560, Height = 34, ForeColor = Color.White, BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 11f, FontStyle.Bold), AutoSize = true };
     private readonly Label _downloadDetailsLabel = new() { Left = 30, Top = 146, Width = 560, Height = 44, ForeColor = Color.FromArgb(197, 206, 231), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9.5f, FontStyle.Regular), Text = "No active download.", AutoSize = false };
     private readonly Label _gameProgressLabel = new() { Left = 30, Top = 178, Width = 260, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true };
-    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 228, Width = 260, Height = 20, Text = "ASSETS", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true };
+    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 228, Width = 260, Height = 20, Text = "HELPER", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true };
 
     protected readonly ProgressBar GameProgress = new() { Left = 30, Top = 200, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous };
     protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 250, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous };
@@ -113,14 +113,28 @@ public abstract class LauncherFormBase : Form
         StatusLabel.Text = headline;
         _downloadDetailsLabel.Text = details;
 
-        if (status.Contains("assets", StringComparison.OrdinalIgnoreCase) ||
-            status.Contains("assets-main.zip", StringComparison.OrdinalIgnoreCase))
+        var isUnpacking = snapshot.State == UpdateState.Unzipping ||
+                          status.StartsWith("Unpacking ", StringComparison.OrdinalIgnoreCase);
+        var isAssetsWork = status.Contains("assets", StringComparison.OrdinalIgnoreCase) ||
+                           status.Contains("assets-main.zip", StringComparison.OrdinalIgnoreCase);
+
+        if (isUnpacking)
         {
+            _assetsProgressLabel.Text = "UNPACKING";
+            AssetsProgress.Style = ProgressBarStyle.Continuous;
             AssetsProgress.Value = pct;
         }
         else
         {
+            _gameProgressLabel.Text = isAssetsWork ? "ASSETS" : "GAME FILES";
+            GameProgress.Style = ProgressBarStyle.Continuous;
             GameProgress.Value = pct;
+            if (snapshot.State != UpdateState.Paused)
+            {
+                _assetsProgressLabel.Text = "HELPER";
+                AssetsProgress.Style = ProgressBarStyle.Continuous;
+                AssetsProgress.Value = 0;
+            }
         }
 
         if (string.IsNullOrWhiteSpace(StatusLabel.Text))
@@ -320,16 +334,22 @@ public abstract class LauncherFormBase : Form
         {
             StatusLabel.Text = "Runtime missing. Preparing prerequisites...";
             _downloadDetailsLabel.Text = "Downloading/extracting VC++ runtime DLLs...";
+            _assetsProgressLabel.Text = "PREREQUISITES";
+            AssetsProgress.Style = ProgressBarStyle.Marquee;
             var installOk = await DependencyInstaller.InstallDependenciesAsync(AppContext.BaseDirectory);
+            AssetsProgress.Style = ProgressBarStyle.Continuous;
+            AssetsProgress.Value = installOk ? 100 : 0;
             if (!installOk || !HasVc100Runtime())
             {
                 StatusLabel.Text = "Dependency install failed";
                 _downloadDetailsLabel.Text = "Automatic runtime setup failed (VC++/DirectX).";
+                _assetsProgressLabel.Text = "HELPER";
                 return;
             }
 
             StatusLabel.Text = "Runtime ready. Launching game...";
             _downloadDetailsLabel.Text = "VC++ runtime setup completed automatically.";
+            _assetsProgressLabel.Text = "HELPER";
         }
 
         var ok = await GameLauncher.LaunchAsync(AppContext.BaseDirectory, Settings.NkspLaunchParameter);
