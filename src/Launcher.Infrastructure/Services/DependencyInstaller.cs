@@ -12,7 +12,10 @@ public sealed class DependencyInstaller : IDependencyInstaller
     private const string Vc2010X86Url = "https://download.microsoft.com/download/C/6/D/C6D0FD4E-9E53-4897-9B91-836EBA2AACD3/vcredist_x86.exe";
     private const string DirectXWebUrl = "https://download.microsoft.com/download/1/7/1/1718ccc4-6315-4d8e-9543-8e28a4e18c4c/dxwebsetup.exe";
 
-    public async Task<bool> InstallDependenciesAsync(string launcherRootPath, CancellationToken cancellationToken = default)
+    public async Task<bool> InstallDependenciesAsync(
+        string launcherRootPath,
+        bool allowInstallerExecution = false,
+        CancellationToken cancellationToken = default)
     {
         if (HasRuntimeDllsInBin(launcherRootPath))
         {
@@ -28,15 +31,11 @@ public sealed class DependencyInstaller : IDependencyInstaller
             launcherRootPath,
             "vcredist_2010_x86.exe",
             "vcredist_x86.exe");
-        var dx = ResolveLocalInstaller(
-            launcherRootPath,
-            "dxwebsetup.exe");
 
         var cacheRoot = Path.Combine(launcherRootPath, "_prereq-cache");
         Directory.CreateDirectory(cacheRoot);
 
         vc ??= await DownloadInstallerAsync(Vc2010X86Url, Path.Combine(cacheRoot, "vcredist_x86.exe"), cancellationToken);
-        dx ??= await DownloadInstallerAsync(DirectXWebUrl, Path.Combine(cacheRoot, "dxwebsetup.exe"), cancellationToken);
 
         // Prefer no-admin path: extract runtime DLLs from the downloaded VC installer
         // and deploy them app-local into Bin/.
@@ -47,6 +46,16 @@ public sealed class DependencyInstaller : IDependencyInstaller
                 return true;
             }
         }
+
+        if (!allowInstallerExecution)
+        {
+            return false;
+        }
+
+        var dx = ResolveLocalInstaller(
+            launcherRootPath,
+            "dxwebsetup.exe");
+        dx ??= await DownloadInstallerAsync(DirectXWebUrl, Path.Combine(cacheRoot, "dxwebsetup.exe"), cancellationToken);
 
         var ranAnyInstaller = false;
         var ok = true;

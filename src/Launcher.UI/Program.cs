@@ -55,7 +55,7 @@ internal static class Program
 
         if (command.Command == LauncherCommand.InstallDependencies)
         {
-            await depInstaller.InstallDependenciesAsync(root);
+            await depInstaller.InstallDependenciesAsync(root, allowInstallerExecution: true);
             return;
         }
 

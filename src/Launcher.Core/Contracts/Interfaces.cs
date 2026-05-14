@@ -47,7 +47,10 @@ public interface IShortcutService
 
 public interface IDependencyInstaller
 {
-    Task<bool> InstallDependenciesAsync(string launcherDocsDirectory, CancellationToken cancellationToken = default);
+    Task<bool> InstallDependenciesAsync(
+        string launcherDocsDirectory,
+        bool allowInstallerExecution = false,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IGameLauncher
