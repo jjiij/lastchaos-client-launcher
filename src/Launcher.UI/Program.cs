@@ -181,9 +181,23 @@ internal static class Program
         }
 
         var targetExe = Path.Combine(targetRoot, InstalledExeName);
+        var currentDir = Path.GetDirectoryName(sourceExe) ?? currentRoot;
+        var source7zr = Path.Combine(currentDir, "7zr.exe");
+        var target7zr = Path.Combine(targetRoot, "7zr.exe");
+        var sourceIcon = Path.Combine(currentDir, "LastChaosGenesis.ico");
+        var targetIcon = Path.Combine(targetRoot, "LastChaosGenesis.ico");
+
         progress.UpdateProgress(10, "Installing to AppData...");
         Application.DoEvents();
         File.Copy(sourceExe, targetExe, overwrite: true);
+        if (File.Exists(source7zr))
+        {
+            File.Copy(source7zr, target7zr, overwrite: true);
+        }
+        if (File.Exists(sourceIcon))
+        {
+            File.Copy(sourceIcon, targetIcon, overwrite: true);
+        }
         progress.UpdateProgress(85, "Creating shortcut...");
         Application.DoEvents();
 
