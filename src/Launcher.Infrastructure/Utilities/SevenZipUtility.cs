@@ -5,20 +5,24 @@ namespace Launcher.Infrastructure.Utilities;
 
 public static class SevenZipUtility
 {
-    public static string ResolveSevenZipPath(string root)
-    {
-        var candidates = new[]
-        {
-            Path.Combine(root, "7zr.exe")
-        };
+    private const string SevenZipUrl = "https://www.7-zip.org/a/7zr.exe";
 
-        var hit = candidates.FirstOrDefault(File.Exists);
-        if (string.IsNullOrWhiteSpace(hit))
+    public static async Task<string> ResolveSevenZipPathAsync(string root, CancellationToken cancellationToken = default)
+    {
+        var target = Path.Combine(root, "7zr.exe");
+        if (File.Exists(target))
         {
-            throw new FileNotFoundException("Bundled 7zr.exe not found in launcher root.");
+            return target;
         }
 
-        return hit;
+        Directory.CreateDirectory(root);
+        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        using var response = await http.GetAsync(SevenZipUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var output = new FileStream(target, FileMode.Create, FileAccess.Write, FileShare.None);
+        await input.CopyToAsync(output, cancellationToken);
+        return target;
     }
 
     public static async Task<bool> ExtractAsync(
@@ -29,7 +33,7 @@ public static class SevenZipUtility
         CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(outputDirectory);
-        var sevenZip = ResolveSevenZipPath(root);
+        var sevenZip = await ResolveSevenZipPathAsync(root, cancellationToken);
 
         using var process = new Process
         {
