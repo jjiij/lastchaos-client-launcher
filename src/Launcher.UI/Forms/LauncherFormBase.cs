@@ -3,6 +3,8 @@ using System.Text.Json;
 using Launcher.Core.Contracts;
 using Launcher.Core.Enums;
 using Launcher.Core.Models;
+using Microsoft.Win32;
+using System.Runtime.InteropServices;
 
 namespace Launcher.UI.Forms;
 
@@ -159,6 +161,12 @@ public abstract class LauncherFormBase : Form
         e.Graphics.FillEllipse(glow2, Width - 420, 260, 360, 360);
     }
 
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        TryApplyDarkTitleBar();
+    }
+
     private void ConfigureTheme()
     {
         _newsPanel.BackColor = Color.FromArgb(19, 24, 37);
@@ -191,6 +199,48 @@ public abstract class LauncherFormBase : Form
             Math.Min(background.G + 15, 255),
             Math.Min(background.B + 15, 255));
     }
+
+    private void TryApplyDarkTitleBar()
+    {
+        try
+        {
+            if (!IsWindowsAppDarkModeEnabled())
+            {
+                return;
+            }
+
+            var useDark = 1;
+            // Windows 10 1903+ commonly uses 20, older preview builds used 19.
+            _ = DwmSetWindowAttribute(Handle, 20, ref useDark, Marshal.SizeOf<int>());
+            _ = DwmSetWindowAttribute(Handle, 19, ref useDark, Marshal.SizeOf<int>());
+        }
+        catch
+        {
+            // Non-fatal on unsupported systems.
+        }
+    }
+
+    private static bool IsWindowsAppDarkModeEnabled()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            var value = key?.GetValue("AppsUseLightTheme");
+            if (value is int intValue)
+            {
+                return intValue == 0;
+            }
+        }
+        catch
+        {
+            // ignored
+        }
+
+        return false;
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
 
     private void OnLauncherLoaded()
     {
