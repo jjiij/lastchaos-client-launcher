@@ -209,20 +209,6 @@ internal static class Program
     {
         try
         {
-            var shell = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(targetExe, relaunchArgs)
-            {
-                WorkingDirectory = targetRoot,
-                UseShellExecute = true
-            });
-            if (shell is not null) return true;
-        }
-        catch
-        {
-            // fallback below
-        }
-
-        try
-        {
             var direct = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = targetExe,
