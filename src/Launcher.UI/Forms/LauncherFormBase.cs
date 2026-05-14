@@ -34,10 +34,10 @@ public abstract class LauncherFormBase : Form
     protected readonly ProgressBar GameProgress = new() { Left = 30, Top = 200, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous };
     protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 250, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous, Visible = false };
 
-    protected readonly Button PrimaryButton = new() { Left = 30, Top = 290, Width = 298, Height = 64, Text = "Download / Update", Font = new Font("Segoe UI", 13f, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
+    protected readonly Button PrimaryButton = new() { Left = 30, Top = 290, Width = 298, Height = 64, Text = "Download", Font = new Font("Segoe UI", 13f, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
     protected readonly Button PauseButton = new() { Left = 338, Top = 290, Width = 78, Height = 64, Text = "Pause", FlatStyle = FlatStyle.Flat };
     protected readonly Button RepairButton = new() { Left = 426, Top = 290, Width = 78, Height = 64, Text = "Repair", FlatStyle = FlatStyle.Flat };
-    protected readonly Button InstallDepsButton = new() { Left = 514, Top = 290, Width = 120, Height = 64, Text = "Prepare Deps", FlatStyle = FlatStyle.Flat, Visible = false };
+    protected readonly Button InstallDepsButton = new() { Left = 514, Top = 290, Width = 120, Height = 64, Text = "Deps", FlatStyle = FlatStyle.Flat, Visible = false };
     protected readonly Button SaveButton = new() { Left = 514, Top = 290, Width = 76, Height = 64, Text = "Save", FlatStyle = FlatStyle.Flat };
 
     private CancellationTokenSource? _cts;
@@ -192,6 +192,9 @@ public abstract class LauncherFormBase : Form
     {
         button.BackColor = background;
         button.ForeColor = foreground;
+        button.TextAlign = ContentAlignment.MiddleCenter;
+        button.Padding = Padding.Empty;
+        button.UseCompatibleTextRendering = true;
         button.FlatAppearance.BorderColor = Color.FromArgb(95, 115, 158);
         button.FlatAppearance.BorderSize = 1;
         button.FlatAppearance.MouseOverBackColor = Color.FromArgb(
@@ -298,7 +301,7 @@ public abstract class LauncherFormBase : Form
         AssetsProgress.SetBounds(30, y, contentWidth, 16);
 
         var auxButtonCount = InstallDepsButton.Visible ? 4 : 3;
-        var secondaryWidth = Math.Max(82, (contentWidth - 280 - (buttonGap * auxButtonCount)) / auxButtonCount);
+        var secondaryWidth = Math.Max(106, (contentWidth - 280 - (buttonGap * auxButtonCount)) / auxButtonCount);
         var buttonTop = _actionPanel.Height - buttonHeight - actionBottomPadding;
         PrimaryButton.SetBounds(30, buttonTop, 280, buttonHeight);
         PauseButton.SetBounds(PrimaryButton.Right + buttonGap, buttonTop, secondaryWidth, buttonHeight);
@@ -454,7 +457,7 @@ public abstract class LauncherFormBase : Form
 
     private void UpdatePrimaryButtonLabel()
     {
-        PrimaryButton.Text = HasLaunchableGame() ? "Launch Game" : "Download / Update";
+        PrimaryButton.Text = HasLaunchableGame() ? "Launch Game" : "Download";
     }
 
     private void ShowHelperProgress(string label, int percent, bool marquee)
