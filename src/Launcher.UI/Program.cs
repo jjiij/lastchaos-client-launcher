@@ -12,6 +12,7 @@ internal static class Program
 {
     private const string InstallDirName = "LastChaos Genesis";
     private const string RelocatedArg = "--relocated";
+    private const string PortableArg = "--portable";
     private const string LauncherRepo = "jjiij/lastchaos-client-launcher";
     private const string PdbAssetName = "LastChaosGenesis-pdb.zip";
 
@@ -143,6 +144,11 @@ internal static class Program
     private static bool EnsureInstalledLocation(string[] args)
     {
         if (args.Any(a => a.Equals(RelocatedArg, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        if (args.Any(a => a.Equals(PortableArg, StringComparison.OrdinalIgnoreCase)))
         {
             return true;
         }
