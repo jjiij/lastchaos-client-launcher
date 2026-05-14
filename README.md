@@ -47,4 +47,4 @@ dotnet run --project src/Launcher.UI/Launcher.UI.csproj
 
 - Legacy AutoPlay assets/source were intentionally removed from this repository.
 - This repository now tracks only the WinForms launcher codebase.
-- The launcher automatically tries to download/extract VC++ 2010 runtime DLLs (`msvcp100.dll`, `msvcr100.dll`) into `Bin/` before game launch. Optional fallback: pre-bundle them in `src/Launcher.UI/runtime-dlls/`.
+- The launcher automatically downloads/extracts required VC++ 2010 runtime DLLs (`msvcp100.dll`, `msvcr100.dll`) into `Bin/` before game launch.

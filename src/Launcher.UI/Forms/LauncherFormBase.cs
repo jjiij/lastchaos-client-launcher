@@ -318,17 +318,18 @@ public abstract class LauncherFormBase : Form
     {
         if (!HasVc100Runtime())
         {
-            StatusLabel.Text = "Installing required runtime dependencies...";
-            _downloadDetailsLabel.Text = "Preparing VC++/DirectX prerequisites.";
+            StatusLabel.Text = "Runtime missing. Preparing prerequisites...";
+            _downloadDetailsLabel.Text = "Downloading/extracting VC++ runtime DLLs...";
             var installOk = await DependencyInstaller.InstallDependenciesAsync(AppContext.BaseDirectory);
             if (!installOk || !HasVc100Runtime())
             {
                 StatusLabel.Text = "Dependency install failed";
-                _downloadDetailsLabel.Text = "Could not install VC++ 2010 runtime automatically.";
+                _downloadDetailsLabel.Text = "Automatic runtime setup failed (VC++/DirectX).";
                 return;
             }
 
-            _downloadDetailsLabel.Text = "Dependencies installed.";
+            StatusLabel.Text = "Runtime ready. Launching game...";
+            _downloadDetailsLabel.Text = "VC++ runtime setup completed automatically.";
         }
 
         var ok = await GameLauncher.LaunchAsync(AppContext.BaseDirectory, Settings.NkspLaunchParameter);
