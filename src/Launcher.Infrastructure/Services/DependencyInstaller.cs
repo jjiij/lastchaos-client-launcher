@@ -205,13 +205,30 @@ public sealed class DependencyInstaller : IDependencyInstaller
         }
         Directory.CreateDirectory(extractDir);
 
-        // VS2010 redist supports extraction without installation.
-        var extracted = await RunProcessAsync(
-            vcInstallerPath,
+        // Different VC++ packages support different extraction switches.
+        var extractionArgs = new[]
+        {
             $"/extract:\"{extractDir}\" /q",
-            useShellExecute: false,
-            runAsAdmin: false,
-            cancellationToken: cancellationToken);
+            $"/q /extract:\"{extractDir}\"",
+            $"/Q /T:\"{extractDir}\" /C",
+            $"/c /t:\"{extractDir}\""
+        };
+
+        var extracted = false;
+        foreach (var args in extractionArgs)
+        {
+            extracted = await RunProcessAsync(
+                vcInstallerPath,
+                args,
+                useShellExecute: false,
+                runAsAdmin: false,
+                cancellationToken: cancellationToken);
+
+            if (extracted && Directory.EnumerateFiles(extractDir, "*", SearchOption.AllDirectories).Any())
+            {
+                break;
+            }
+        }
 
         if (!extracted)
         {
