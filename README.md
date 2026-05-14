@@ -21,7 +21,7 @@ Modern .NET 8 WinForms launcher replacing the legacy AutoPlay project.
 - Manual update trigger (no forced auto-download on launch)
 - Repair/checklist flow and legacy config migration support
 - Self-contained publish target for runtime-bundled Windows x86 binaries
-- Bundled `tools/7zip/7zr.exe` used for all archive extraction (game/assets and VC++ payload extraction)
+- Bundled `7zr.exe` (launcher root) used for all archive extraction (game/assets and VC++ payload extraction)
 
 ## Build (Windows)
 

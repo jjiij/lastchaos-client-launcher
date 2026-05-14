@@ -9,14 +9,13 @@ public static class SevenZipUtility
     {
         var candidates = new[]
         {
-            Path.Combine(root, "tools", "7zip", "7zr.exe"),
             Path.Combine(root, "7zr.exe")
         };
 
         var hit = candidates.FirstOrDefault(File.Exists);
         if (string.IsNullOrWhiteSpace(hit))
         {
-            throw new FileNotFoundException("Bundled 7zr.exe not found. Expected at tools/7zip/7zr.exe.");
+            throw new FileNotFoundException("Bundled 7zr.exe not found in launcher root.");
         }
 
         return hit;

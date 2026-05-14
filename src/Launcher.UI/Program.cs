@@ -9,6 +9,9 @@ namespace Launcher.UI;
 
 internal static class Program
 {
+    private const string InstallDirName = "LastChaos Genesis";
+    private const string RelocatedArg = "--relocated";
+
     [STAThread]
     private static void Main(string[] args)
     {
@@ -28,6 +31,11 @@ internal static class Program
 
     private static async Task Run(string[] args)
     {
+        if (!EnsureInstalledLocation(args))
+        {
+            return;
+        }
+
         var root = AppContext.BaseDirectory;
         var settingsStore = new JsonSettingsStore(root);
         var settings = await settingsStore.LoadAsync();
@@ -68,6 +76,100 @@ internal static class Program
         var form = CreateForm(settings, command.Command == LauncherCommand.Dev, updateService, repairService, settingsStore, depInstaller, gameLauncher, shortcutService);
         progressBridge.Attach(form);
         Application.Run(form);
+    }
+
+    private static bool EnsureInstalledLocation(string[] args)
+    {
+        if (args.Any(a => a.Equals(RelocatedArg, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        var currentRoot = Path.GetFullPath(AppContext.BaseDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var targetRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            InstallDirName).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        if (string.Equals(currentRoot, targetRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            EnsureDesktopShortcut(targetRoot);
+            return true;
+        }
+
+        Directory.CreateDirectory(targetRoot);
+        CopyDirectory(currentRoot, targetRoot);
+        EnsureDesktopShortcut(targetRoot);
+
+        var exePath = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(exePath))
+        {
+            return true;
+        }
+
+        var targetExe = Path.Combine(targetRoot, Path.GetFileName(exePath));
+        var relaunchArgs = string.Join(" ", args.Concat([RelocatedArg]).Select(QuoteArg));
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(targetExe, relaunchArgs)
+        {
+            WorkingDirectory = targetRoot,
+            UseShellExecute = true
+        });
+
+        return false;
+    }
+
+    private static void EnsureDesktopShortcut(string installRoot)
+    {
+        try
+        {
+            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            Directory.CreateDirectory(desktop);
+            var shortcutPath = Path.Combine(desktop, "LastChaos Genesis.url");
+            var exePath = Environment.ProcessPath ?? Path.Combine(installRoot, "Launcher.UI.exe");
+            var gameExe = Path.Combine(installRoot, "Bin", "Nksp.exe");
+            var iconPath = File.Exists(gameExe) ? gameExe : exePath;
+
+            var content = "[InternetShortcut]\r\n" +
+                          $"URL=file:///{exePath.Replace('\\', '/')}\r\n" +
+                          "IconIndex=0\r\n" +
+                          $"IconFile={iconPath}\r\n";
+            File.WriteAllText(shortcutPath, content);
+        }
+        catch
+        {
+            // shortcut creation failure is non-fatal
+        }
+    }
+
+    private static void CopyDirectory(string source, string destination)
+    {
+        foreach (var dir in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
+        {
+            var relativeDir = Path.GetRelativePath(source, dir);
+            Directory.CreateDirectory(Path.Combine(destination, relativeDir));
+        }
+
+        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(source, file);
+            var target = Path.Combine(destination, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target, overwrite: true);
+        }
+    }
+
+    private static string QuoteArg(string arg)
+    {
+        if (string.IsNullOrEmpty(arg))
+        {
+            return "\"\"";
+        }
+
+        if (!arg.Contains(' ') && !arg.Contains('"'))
+        {
+            return arg;
+        }
+
+        return "\"" + arg.Replace("\"", "\\\"") + "\"";
     }
 
     private static LauncherFormBase CreateForm(

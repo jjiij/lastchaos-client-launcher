@@ -16,7 +16,7 @@
     <ProjectReference Include="..\Launcher.Infrastructure\Launcher.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="tools\7zip\**\*">
+    <Content Include="7zr.exe">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
