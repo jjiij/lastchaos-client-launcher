@@ -130,7 +130,10 @@ public abstract class LauncherFormBase : Form
             GameProgress.Value = pct;
             if (snapshot.State != UpdateState.Paused && !_isPreparingRuntime)
             {
-                HideHelperProgress();
+                if (_assetsProgressLabel.Text.Equals("UNPACKING", StringComparison.OrdinalIgnoreCase))
+                {
+                    HideHelperProgress();
+                }
             }
         }
 
@@ -286,6 +289,10 @@ public abstract class LauncherFormBase : Form
         _isUpdating = false;
         PrimaryButton.Enabled = true;
         PauseButton.Text = "Pause";
+        if (!_isPreparingRuntime)
+        {
+            HideHelperProgress();
+        }
         StatusLabel.Text = result.Success ? $"Completed: {result.Message}" : $"Error: {result.Message}";
         _downloadDetailsLabel.Text = result.Success ? "Update finished." : "Update failed.";
 
