@@ -276,6 +276,7 @@ public abstract class LauncherFormBase : Form
         _isUpdating = true;
         PrimaryButton.Enabled = false;
         PrimaryButton.Text = "Updating...";
+        PauseButton.Text = "Pause";
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
 
@@ -284,6 +285,7 @@ public abstract class LauncherFormBase : Form
 
         _isUpdating = false;
         PrimaryButton.Enabled = true;
+        PauseButton.Text = "Pause";
         StatusLabel.Text = result.Success ? $"Completed: {result.Message}" : $"Error: {result.Message}";
         _downloadDetailsLabel.Text = result.Success ? "Update finished." : "Update failed.";
 
@@ -302,7 +304,12 @@ public abstract class LauncherFormBase : Form
 
     private void TogglePause()
     {
-        if (UpdateService.State == UpdateState.Paused)
+        if (!_isUpdating)
+        {
+            return;
+        }
+
+        if (PauseButton.Text.Equals("Resume", StringComparison.OrdinalIgnoreCase))
         {
             UpdateService.Resume();
             PauseButton.Text = "Pause";

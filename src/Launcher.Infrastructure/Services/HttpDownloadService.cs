@@ -16,6 +16,14 @@ public sealed class HttpDownloadService : IDownloadService
     }
 
     public async Task DownloadAsync(string url, string targetFile, IProgress<ProgressSnapshot>? progress = null, CancellationToken cancellationToken = default)
+        => await DownloadAsync(url, targetFile, progress, shouldPause: null, cancellationToken);
+
+    public async Task DownloadAsync(
+        string url,
+        string targetFile,
+        IProgress<ProgressSnapshot>? progress = null,
+        Func<bool>? shouldPause = null,
+        CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(targetFile) ?? ".");
         var partFile = targetFile + ".part";
@@ -40,20 +48,20 @@ public sealed class HttpDownloadService : IDownloadService
             req.Headers.Range = null;
             using var retry = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             retry.EnsureSuccessStatusCode();
-            await WriteStreamAsync(retry, partFile, false, totalLength, existingLength, progress, cancellationToken);
+            await WriteStreamAsync(retry, partFile, false, totalLength, existingLength, progress, shouldPause, cancellationToken);
         }
         else
         {
             res.EnsureSuccessStatusCode();
             var append = res.StatusCode == HttpStatusCode.PartialContent && existingLength > 0;
-            await WriteStreamAsync(res, partFile, append, totalLength, existingLength, progress, cancellationToken);
+            await WriteStreamAsync(res, partFile, append, totalLength, existingLength, progress, shouldPause, cancellationToken);
         }
 
         File.Move(partFile, targetFile, true);
     }
 
     private static async Task WriteStreamAsync(HttpResponseMessage response, string partFile, bool append, long? totalLength,
-        long existingLength, IProgress<ProgressSnapshot>? progress, CancellationToken cancellationToken)
+        long existingLength, IProgress<ProgressSnapshot>? progress, Func<bool>? shouldPause, CancellationToken cancellationToken)
     {
         await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
         await using var target = new FileStream(partFile, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
@@ -65,6 +73,23 @@ public sealed class HttpDownloadService : IDownloadService
 
         while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
         {
+            while (shouldPause?.Invoke() == true)
+            {
+                progress?.Report(new ProgressSnapshot
+                {
+                    State = UpdateState.Paused,
+                    Percent = totalLength.HasValue && totalLength.Value > 0
+                        ? (int)Math.Clamp((double)transferred / totalLength.Value * 100, 0, 100)
+                        : 0,
+                    BytesTotal = totalLength ?? 0,
+                    BytesTransferred = transferred,
+                    SpeedBytesPerSecond = 0,
+                    StatusText = $"Downloading {Path.GetFileName(partFile)}"
+                });
+                cancellationToken.ThrowIfCancellationRequested();
+                await Task.Delay(200, cancellationToken);
+            }
+
             await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
             transferred += read;
 

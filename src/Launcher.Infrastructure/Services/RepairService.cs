@@ -51,7 +51,7 @@ public sealed class RepairService : IRepairService
 
             var checklistUrl = new Uri(baseUri, "client/checklist.txt").ToString();
             var tmpChecklist = Path.Combine(_root, "_remote_checklist.txt");
-            await _downloadService.DownloadAsync(checklistUrl, tmpChecklist, _progress, cancellationToken);
+            await _downloadService.DownloadAsync(checklistUrl, tmpChecklist, _progress, null, cancellationToken);
 
             var lines = await File.ReadAllLinesAsync(tmpChecklist, cancellationToken);
             var checkedFiles = 0;
@@ -80,7 +80,7 @@ public sealed class RepairService : IRepairService
 
                 var fileUrl = new Uri(baseUri, "client/" + parts[1].Trim().Replace('\\', '/')).ToString();
                 Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
-                await _downloadService.DownloadAsync(fileUrl, localPath, _progress, cancellationToken);
+                await _downloadService.DownloadAsync(fileUrl, localPath, _progress, null, cancellationToken);
                 repairedFiles++;
             }
 

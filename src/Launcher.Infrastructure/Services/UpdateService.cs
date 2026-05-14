@@ -73,7 +73,7 @@ public sealed class UpdateService : IUpdateService
             var zipPath = Path.Combine(_root, "assets-main.zip");
             var extract = Path.Combine(_root, "_assets_extract");
 
-            await _downloadService.DownloadAsync(zipUrl, zipPath, _progress, cancellationToken);
+            await _downloadService.DownloadAsync(zipUrl, zipPath, _progress, () => _paused, cancellationToken);
             WaitIfPaused(cancellationToken);
 
             State = UpdateState.Unzipping;
@@ -117,7 +117,7 @@ public sealed class UpdateService : IUpdateService
             var downloadPath = Path.Combine(_root, "launcher-update.zip");
             var stagePath = Path.Combine(_root, "_launcher_update");
 
-            await _downloadService.DownloadAsync(asset.BrowserDownloadUrl, downloadPath, _progress, cancellationToken);
+            await _downloadService.DownloadAsync(asset.BrowserDownloadUrl, downloadPath, _progress, () => _paused, cancellationToken);
 
             if (Directory.Exists(stagePath)) Directory.Delete(stagePath, true);
             ExtractZipWithProgress(downloadPath, stagePath, "launcher", cancellationToken);
@@ -168,7 +168,7 @@ public sealed class UpdateService : IUpdateService
             {
                 var path = Path.Combine(_root, asset.Name);
                 downloadedParts.Add(path);
-                await _downloadService.DownloadAsync(asset.BrowserDownloadUrl, path, _progress, cancellationToken);
+                await _downloadService.DownloadAsync(asset.BrowserDownloadUrl, path, _progress, () => _paused, cancellationToken);
                 WaitIfPaused(cancellationToken);
             }
 

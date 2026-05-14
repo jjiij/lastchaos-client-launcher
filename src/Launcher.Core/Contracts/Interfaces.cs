@@ -16,7 +16,12 @@ public interface IGitHubReleaseClient
 
 public interface IDownloadService
 {
-    Task DownloadAsync(string url, string targetFile, IProgress<ProgressSnapshot>? progress = null, CancellationToken cancellationToken = default);
+    Task DownloadAsync(
+        string url,
+        string targetFile,
+        IProgress<ProgressSnapshot>? progress = null,
+        Func<bool>? shouldPause = null,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IUpdateService
