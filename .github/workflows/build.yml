@@ -41,6 +41,29 @@ jobs:
       - name: Publish WinForms app
         run: dotnet publish src/Launcher.UI/Launcher.UI.csproj -c Release -r win-x86 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:PublishTrimmed=false -o out/launcher
 
+      - name: Prepare release exe and PDB bundle
+        shell: powershell
+        run: |
+          $publishedExe = Join-Path $pwd "out/launcher/Launcher.UI.exe"
+          if (-not (Test-Path $publishedExe)) {
+            throw "Published launcher exe not found at $publishedExe"
+          }
+
+          Copy-Item $publishedExe "LastChaosGenesis-Setup.exe" -Force
+
+          $pdbDir = Join-Path $pwd "out/pdb"
+          New-Item -ItemType Directory -Path $pdbDir -Force | Out-Null
+          Get-ChildItem -Path "src","tests" -Recurse -Filter *.pdb -ErrorAction SilentlyContinue |
+            Copy-Item -Destination $pdbDir -Force
+
+          if (Get-ChildItem -Path $pdbDir -Filter *.pdb -ErrorAction SilentlyContinue) {
+            Compress-Archive -Path "$pdbDir/*" -DestinationPath "LastChaosGenesis-pdb.zip" -Force
+          } else {
+            Write-Host "No PDB files found; creating empty marker zip."
+            "No PDB files were produced in this build." | Out-File -FilePath "$pdbDir/README.txt" -Encoding utf8
+            Compress-Archive -Path "$pdbDir/*" -DestinationPath "LastChaosGenesis-pdb.zip" -Force
+          }
+
       - name: Package launcher
         shell: powershell
         run: Compress-Archive -Path "out/launcher/*" -DestinationPath "lastchaos-launcher-windows-x86.zip" -Force
@@ -48,7 +71,10 @@ jobs:
       - name: Upload release artifact
         uses: softprops/action-gh-release@v2
         with:
-          files: lastchaos-launcher-windows-x86.zip
+          files: |
+            LastChaosGenesis-Setup.exe
+            LastChaosGenesis-pdb.zip
+            lastchaos-launcher-windows-x86.zip
           tag_name: latest
           name: Latest Build
           body: "LastChaos WinForms launcher build"
