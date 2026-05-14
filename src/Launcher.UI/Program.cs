@@ -108,13 +108,26 @@ internal static class Program
 
         var targetExe = Path.Combine(targetRoot, Path.GetFileName(exePath));
         var relaunchArgs = string.Join(" ", args.Concat([RelocatedArg]).Select(QuoteArg));
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(targetExe, relaunchArgs)
+        try
         {
-            WorkingDirectory = targetRoot,
-            UseShellExecute = true
-        });
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(targetExe, relaunchArgs)
+            {
+                WorkingDirectory = targetRoot,
+                UseShellExecute = true
+            });
 
-        return false;
+            return false;
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            // Relaunch cancelled by user/UAC flow; continue from current location.
+            return true;
+        }
+        catch
+        {
+            // If restart fails for any reason, keep launcher usable in current location.
+            return true;
+        }
     }
 
     private static void EnsureDesktopShortcut(string installRoot)
