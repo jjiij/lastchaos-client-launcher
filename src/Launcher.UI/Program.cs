@@ -136,7 +136,8 @@ internal static class Program
         {
             var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             Directory.CreateDirectory(desktop);
-            var shortcutPath = Path.Combine(desktop, "LastChaos Genesis.url");
+            var shortcutPath = Path.Combine(desktop, "LastChaos Genesis.lnk");
+            var legacyUrlPath = Path.Combine(desktop, "LastChaos Genesis.url");
             var exeName = Path.GetFileName(Environment.ProcessPath);
             if (string.IsNullOrWhiteSpace(exeName))
             {
@@ -160,12 +161,24 @@ internal static class Program
                 exePath
             };
             var iconPath = iconCandidates.FirstOrDefault(File.Exists) ?? exePath;
+            if (File.Exists(legacyUrlPath))
+            {
+                File.Delete(legacyUrlPath);
+            }
 
-            var content = "[InternetShortcut]\r\n" +
-                          $"URL=file:///{exePath.Replace('\\', '/')}\r\n" +
-                          "IconIndex=0\r\n" +
-                          $"IconFile={iconPath}\r\n";
-            File.WriteAllText(shortcutPath, content);
+            var shellType = Type.GetTypeFromProgID("WScript.Shell");
+            if (shellType is null)
+            {
+                return;
+            }
+
+            dynamic shell = Activator.CreateInstance(shellType)!;
+            dynamic shortcut = shell.CreateShortcut(shortcutPath);
+            shortcut.TargetPath = exePath;
+            shortcut.WorkingDirectory = installRoot;
+            shortcut.IconLocation = $"{iconPath},0";
+            shortcut.Description = "LastChaos Genesis";
+            shortcut.Save();
         }
         catch
         {
