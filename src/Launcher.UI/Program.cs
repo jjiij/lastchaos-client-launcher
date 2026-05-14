@@ -3,6 +3,7 @@ using Launcher.Core.Enums;
 using Launcher.Core.Models;
 using Launcher.Core.Services;
 using Launcher.Infrastructure.Services;
+using Launcher.Infrastructure.Utilities;
 using Launcher.UI.Forms;
 
 namespace Launcher.UI;
@@ -11,6 +12,8 @@ internal static class Program
 {
     private const string InstallDirName = "LastChaos Genesis";
     private const string RelocatedArg = "--relocated";
+    private const string LauncherRepo = "jjiij/lastchaos-client-launcher";
+    private const string PdbAssetName = "LastChaosGenesis-pdb.zip";
 
     [STAThread]
     private static void Main(string[] args)
@@ -37,6 +40,7 @@ internal static class Program
         }
 
         var root = AppContext.BaseDirectory;
+        _ = Task.Run(() => EnsurePdbSymbolsAsync(root));
         var settingsStore = new JsonSettingsStore(root);
         var settings = await settingsStore.LoadAsync();
 
@@ -78,6 +82,64 @@ internal static class Program
         Application.Run(form);
     }
 
+    private static async Task EnsurePdbSymbolsAsync(string root)
+    {
+        try
+        {
+            var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var installRoot = GetInstallRoot().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!string.Equals(normalizedRoot, installRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var marker = Path.Combine(root, ".pdb_symbols_ready");
+            if (File.Exists(marker) && Directory.GetFiles(root, "*.pdb", SearchOption.TopDirectoryOnly).Length > 0)
+            {
+                return;
+            }
+
+            var symbolsDir = Path.Combine(root, "_symbols");
+            Directory.CreateDirectory(symbolsDir);
+            var zipPath = Path.Combine(symbolsDir, PdbAssetName);
+            var url = $"https://github.com/{LauncherRepo}/releases/latest/download/{PdbAssetName}";
+
+            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+            using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            await using (var input = await response.Content.ReadAsStreamAsync())
+            await using (var output = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                await input.CopyToAsync(output);
+            }
+
+            var extracted = await SevenZipUtility.ExtractAsync(root, zipPath, root, null);
+            if (extracted)
+            {
+                await File.WriteAllTextAsync(marker, DateTime.UtcNow.ToString("O"));
+            }
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                var log = Path.Combine(root, "launcher-pdb.log");
+                await File.AppendAllTextAsync(log, $"[{DateTime.UtcNow:O}] {ex}\n\n");
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+    }
+
+    private static string GetInstallRoot()
+    {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            InstallDirName);
+    }
+
     private static bool EnsureInstalledLocation(string[] args)
     {
         if (args.Any(a => a.Equals(RelocatedArg, StringComparison.OrdinalIgnoreCase)))
@@ -86,9 +148,7 @@ internal static class Program
         }
 
         var currentRoot = Path.GetFullPath(AppContext.BaseDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var targetRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            InstallDirName).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var targetRoot = GetInstallRoot().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
         if (string.Equals(currentRoot, targetRoot, StringComparison.OrdinalIgnoreCase))
         {

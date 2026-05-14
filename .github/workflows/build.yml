@@ -64,17 +64,12 @@ jobs:
             Compress-Archive -Path "$pdbDir/*" -DestinationPath "LastChaosGenesis-pdb.zip" -Force
           }
 
-      - name: Package launcher
-        shell: powershell
-        run: Compress-Archive -Path "out/launcher/*" -DestinationPath "lastchaos-launcher-windows-x86.zip" -Force
-
       - name: Upload release artifact
         uses: softprops/action-gh-release@v2
         with:
           files: |
             LastChaosGenesis-Setup.exe
             LastChaosGenesis-pdb.zip
-            lastchaos-launcher-windows-x86.zip
           tag_name: latest
           name: Latest Build
           body: "LastChaos WinForms launcher build"
