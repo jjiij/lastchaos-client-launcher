@@ -11,6 +11,7 @@ namespace Launcher.UI;
 internal static class Program
 {
     private const string InstallDirName = "LastChaos Genesis";
+    private const string InstalledExeName = "LastChaosGenesis-Launcher.exe";
     private const string RelocatedArg = "--relocated";
     private const string PortableArg = "--portable";
     private const string LauncherRepo = "jjiij/lastchaos-client-launcher";
@@ -173,24 +174,29 @@ internal static class Program
         progress.BringToFront();
         Application.DoEvents();
 
-        CopyDirectory(currentRoot, targetRoot, (percent, detail) =>
-        {
-            progress.UpdateProgress(percent, detail);
-            Application.DoEvents();
-        });
-
-        progress.UpdateProgress(100, "Finalizing...");
-        Application.DoEvents();
-        progress.Close();
-        EnsureDesktopShortcut(targetRoot);
-
-        var exePath = Environment.ProcessPath;
-        if (string.IsNullOrWhiteSpace(exePath))
+        var sourceExe = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(sourceExe) || !File.Exists(sourceExe))
         {
             return true;
         }
 
-        var targetExe = Path.Combine(targetRoot, Path.GetFileName(exePath));
+        var targetExe = Path.Combine(targetRoot, InstalledExeName);
+        progress.UpdateProgress(10, "Installing to AppData...");
+        Application.DoEvents();
+        File.Copy(sourceExe, targetExe, overwrite: true);
+        progress.UpdateProgress(85, "Creating shortcut...");
+        Application.DoEvents();
+
+        EnsureDesktopShortcut(targetRoot);
+        progress.UpdateProgress(100, "Finalizing...");
+        Application.DoEvents();
+        progress.Close();
+
+        if (!File.Exists(targetExe))
+        {
+            return true;
+        }
+
         var relaunchArgs = string.Join(" ", args.Concat([RelocatedArg]).Select(QuoteArg));
         try
         {
@@ -264,13 +270,7 @@ internal static class Program
             Directory.CreateDirectory(desktop);
             var shortcutPath = Path.Combine(desktop, "LastChaos Genesis.lnk");
             var legacyUrlPath = Path.Combine(desktop, "LastChaos Genesis.url");
-            var exeName = Path.GetFileName(Environment.ProcessPath);
-            if (string.IsNullOrWhiteSpace(exeName))
-            {
-                exeName = "Launcher.UI.exe";
-            }
-
-            var exePath = Path.Combine(installRoot, exeName);
+            var exePath = Path.Combine(installRoot, InstalledExeName);
             if (!File.Exists(exePath))
             {
                 // Fallback for first run before relocation copy settles.
@@ -309,31 +309,6 @@ internal static class Program
         catch
         {
             // shortcut creation failure is non-fatal
-        }
-    }
-
-    private static void CopyDirectory(string source, string destination, Action<int, string>? onProgress = null)
-    {
-        var files = Directory.GetFiles(source, "*", SearchOption.AllDirectories);
-        var total = Math.Max(files.Length, 1);
-        var copied = 0;
-
-        foreach (var dir in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
-        {
-            var relativeDir = Path.GetRelativePath(source, dir);
-            Directory.CreateDirectory(Path.Combine(destination, relativeDir));
-        }
-
-        foreach (var file in files)
-        {
-            var relative = Path.GetRelativePath(source, file);
-            var target = Path.Combine(destination, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target, overwrite: true);
-            copied++;
-
-            var pct = Math.Clamp((int)Math.Round(copied * 100d / total), 0, 100);
-            onProgress?.Invoke(pct, $"Installing to AppData... {Path.GetFileName(file)}");
         }
     }
 
