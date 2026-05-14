@@ -1,11 +1,9 @@
-using System.Diagnostics;
 using Launcher.Core.Contracts;
 
 namespace Launcher.Infrastructure.Services;
 
 public sealed class DependencyInstaller : IDependencyInstaller
 {
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(10) };
     private static readonly string[] RequiredRuntimeDlls = ["msvcp100.dll", "msvcr100.dll"];
 
     // Official Microsoft download center hosted files.
@@ -22,9 +20,9 @@ public sealed class DependencyInstaller : IDependencyInstaller
             return true;
         }
 
-        if (TryDeployBundledRuntimeDlls(launcherRootPath))
+        if (!allowInstallerExecution)
         {
-            return true;
+            return false;
         }
 
         var vc = ResolveLocalInstaller(
@@ -35,26 +33,10 @@ public sealed class DependencyInstaller : IDependencyInstaller
         var cacheRoot = Path.Combine(launcherRootPath, "_prereq-cache");
         Directory.CreateDirectory(cacheRoot);
 
-        vc ??= await DownloadInstallerAsync(Vc2010X86Url, Path.Combine(cacheRoot, "vcredist_x86.exe"), cancellationToken);
-
-        // Prefer no-admin path: extract runtime DLLs from the downloaded VC installer
-        // and deploy them app-local into Bin/.
-        if (!string.IsNullOrWhiteSpace(vc) && File.Exists(vc))
-        {
-            if (await TryExtractVcRuntimeDllsAsync(vc, launcherRootPath, cacheRoot, cancellationToken))
-            {
-                return true;
-            }
-        }
-
-        if (!allowInstallerExecution)
-        {
-            return false;
-        }
-
         var dx = ResolveLocalInstaller(
             launcherRootPath,
             "dxwebsetup.exe");
+        vc ??= await DownloadInstallerAsync(Vc2010X86Url, Path.Combine(cacheRoot, "vcredist_x86.exe"), cancellationToken);
         dx ??= await DownloadInstallerAsync(DirectXWebUrl, Path.Combine(cacheRoot, "dxwebsetup.exe"), cancellationToken);
 
         var ranAnyInstaller = false;
@@ -127,19 +109,40 @@ public sealed class DependencyInstaller : IDependencyInstaller
         }
     }
 
+    private static async Task<string?> DownloadInstallerAsync(string url, string targetPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+            using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await using var output = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            await input.CopyToAsync(output, cancellationToken);
+            return targetPath;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static async Task<bool> RunInstallerAsync(string path, string args, CancellationToken cancellationToken)
     {
         try
         {
-            using var process = new Process
+            using var process = new System.Diagnostics.Process
             {
-                StartInfo = new ProcessStartInfo(path, args)
+                StartInfo = new System.Diagnostics.ProcessStartInfo(path, args)
                 {
                     UseShellExecute = true,
                     Verb = "runas"
                 }
             };
-
             process.Start();
             await process.WaitForExitAsync(cancellationToken);
             return process.ExitCode == 0;
@@ -148,124 +151,11 @@ public sealed class DependencyInstaller : IDependencyInstaller
         {
             return false;
         }
-    }
-
-    private static bool TryDeployBundledRuntimeDlls(string launcherRootPath)
-    {
-        var binDir = Path.Combine(launcherRootPath, "Bin");
-        if (!Directory.Exists(binDir))
-        {
-            Directory.CreateDirectory(binDir);
-        }
-
-        var bundleDirs = new[]
-        {
-            Path.Combine(launcherRootPath, "runtime-dlls"),
-            Path.Combine(launcherRootPath, "RuntimeDlls"),
-            Path.Combine(launcherRootPath, "prerequisites", "dll"),
-            Path.Combine(launcherRootPath, "dependencies", "dll")
-        };
-
-        var copiedAny = false;
-        foreach (var dllName in RequiredRuntimeDlls)
-        {
-            var source = bundleDirs
-                .Select(dir => Path.Combine(dir, dllName))
-                .FirstOrDefault(File.Exists);
-
-            if (string.IsNullOrWhiteSpace(source))
-            {
-                continue;
-            }
-
-            var target = Path.Combine(binDir, dllName);
-            File.Copy(source, target, overwrite: true);
-            copiedAny = true;
-        }
-
-        return copiedAny && HasRuntimeDllsInBin(launcherRootPath);
     }
 
     private static bool HasRuntimeDllsInBin(string launcherRootPath)
     {
         var binDir = Path.Combine(launcherRootPath, "Bin");
         return RequiredRuntimeDlls.All(name => File.Exists(Path.Combine(binDir, name)));
-    }
-
-    private static async Task<bool> TryExtractVcRuntimeDllsAsync(
-        string vcInstallerPath,
-        string launcherRootPath,
-        string cacheRoot,
-        CancellationToken cancellationToken)
-    {
-        var extractDir = Path.Combine(cacheRoot, "vc-extract");
-        if (Directory.Exists(extractDir))
-        {
-            Directory.Delete(extractDir, recursive: true);
-        }
-        Directory.CreateDirectory(extractDir);
-
-        // Deterministic extraction command for the pinned VC++ 2010 package.
-        var extracted = await RunProcessAsync(
-            vcInstallerPath,
-            $"/q /c /t:\"{extractDir}\"",
-            useShellExecute: false,
-            runAsAdmin: false,
-            cancellationToken: cancellationToken);
-
-        if (!extracted || !Directory.EnumerateFiles(extractDir, "*", SearchOption.AllDirectories).Any())
-        {
-            return false;
-        }
-
-        var binDir = Path.Combine(launcherRootPath, "Bin");
-        Directory.CreateDirectory(binDir);
-
-        foreach (var dllName in RequiredRuntimeDlls)
-        {
-            var source = Directory
-                .EnumerateFiles(extractDir, dllName, SearchOption.AllDirectories)
-                .FirstOrDefault();
-
-            if (string.IsNullOrWhiteSpace(source))
-            {
-                continue;
-            }
-
-            var target = Path.Combine(binDir, dllName);
-            File.Copy(source, target, overwrite: true);
-        }
-
-        return HasRuntimeDllsInBin(launcherRootPath);
-    }
-
-    private static async Task<bool> RunProcessAsync(
-        string executablePath,
-        string args,
-        bool useShellExecute,
-        bool runAsAdmin,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var startInfo = new ProcessStartInfo(executablePath, args)
-            {
-                UseShellExecute = useShellExecute
-            };
-
-            if (runAsAdmin && useShellExecute)
-            {
-                startInfo.Verb = "runas";
-            }
-
-            using var process = new Process { StartInfo = startInfo };
-            process.Start();
-            await process.WaitForExitAsync(cancellationToken);
-            return process.ExitCode == 0;
-        }
-        catch
-        {
-            return false;
-        }
     }
 }

@@ -40,7 +40,6 @@ public abstract class LauncherFormBase : Form
 
     private CancellationTokenSource? _cts;
     private bool _isUpdating;
-    private bool _isPreparingRuntime;
 
     protected LauncherFormBase(
         string title,
@@ -131,7 +130,7 @@ public abstract class LauncherFormBase : Form
             _gameProgressLabel.Text = isAssetsWork ? "ASSETS" : "GAME FILES";
             GameProgress.Style = ProgressBarStyle.Continuous;
             GameProgress.Value = pct;
-            if (snapshot.State != UpdateState.Paused && !_isPreparingRuntime)
+            if (snapshot.State != UpdateState.Paused)
             {
                 if (_assetsProgressLabel.Text.Equals("UNPACKING", StringComparison.OrdinalIgnoreCase))
                 {
@@ -201,7 +200,6 @@ public abstract class LauncherFormBase : Form
         UpdatePrimaryButtonLabel();
         UpdateDependencyButtonVisibility();
         StatusLabel.Text = "Launcher ready. Checking updates in background...";
-        _ = PrepareRuntimeDependenciesAsync();
     }
 
     private void ApplyResponsiveLayout()
@@ -302,10 +300,7 @@ public abstract class LauncherFormBase : Form
         _isUpdating = false;
         PrimaryButton.Enabled = true;
         PauseButton.Text = "Pause";
-        if (!_isPreparingRuntime)
-        {
-            HideHelperProgress();
-        }
+        HideHelperProgress();
         StatusLabel.Text = result.Success ? $"Completed: {result.Message}" : $"Error: {result.Message}";
         _downloadDetailsLabel.Text = result.Success ? "Update finished." : "Update failed.";
 
@@ -357,24 +352,10 @@ public abstract class LauncherFormBase : Form
     {
         if (!HasVc100Runtime())
         {
-            StatusLabel.Text = "Runtime missing. Preparing prerequisites...";
-            _downloadDetailsLabel.Text = "Downloading/extracting VC++ runtime DLLs...";
-            ShowHelperProgress("PREREQUISITES", 0, marquee: true);
-            var installOk = await DependencyInstaller.InstallDependenciesAsync(AppContext.BaseDirectory);
-            ShowHelperProgress("PREREQUISITES", installOk ? 100 : 0, marquee: false);
-            if (!installOk || !HasVc100Runtime())
-            {
-                StatusLabel.Text = "Dependency install failed";
-                _downloadDetailsLabel.Text = "Automatic runtime setup failed (VC++/DirectX).";
-                HideHelperProgress();
-                UpdateDependencyButtonVisibility();
-                return;
-            }
-
-            StatusLabel.Text = "Runtime ready. Launching game...";
-            _downloadDetailsLabel.Text = "VC++ runtime setup completed automatically.";
-            HideHelperProgress();
+            StatusLabel.Text = "Runtime dependency missing";
+            _downloadDetailsLabel.Text = "Click 'Install Deps' to run VC++/DirectX installers.";
             UpdateDependencyButtonVisibility();
+            return;
         }
 
         var ok = await GameLauncher.LaunchAsync(AppContext.BaseDirectory, Settings.NkspLaunchParameter);
@@ -424,33 +405,6 @@ public abstract class LauncherFormBase : Form
     private void UpdatePrimaryButtonLabel()
     {
         PrimaryButton.Text = HasLaunchableGame() ? "Launch Game" : "Download / Update";
-    }
-
-    private async Task PrepareRuntimeDependenciesAsync()
-    {
-        if (HasVc100Runtime() || _isPreparingRuntime)
-        {
-            return;
-        }
-
-        _isPreparingRuntime = true;
-        ShowHelperProgress("PREREQUISITES", 0, marquee: true);
-        _downloadDetailsLabel.Text = "Preparing runtime dependencies in background...";
-
-        var ok = await DependencyInstaller.InstallDependenciesAsync(AppContext.BaseDirectory);
-        _isPreparingRuntime = false;
-
-        if (ok && HasVc100Runtime())
-        {
-            _downloadDetailsLabel.Text = "Runtime dependencies ready.";
-            HideHelperProgress();
-            UpdateDependencyButtonVisibility();
-            return;
-        }
-
-        _downloadDetailsLabel.Text = "Runtime dependencies will be retried on launch.";
-        HideHelperProgress();
-        UpdateDependencyButtonVisibility();
     }
 
     private void ShowHelperProgress(string label, int percent, bool marquee)
