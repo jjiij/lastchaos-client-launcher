@@ -205,45 +205,15 @@ public sealed class DependencyInstaller : IDependencyInstaller
         }
         Directory.CreateDirectory(extractDir);
 
-        var argsHintFile = Path.Combine(cacheRoot, "vc_extract_args.txt");
-        var extractionArgs = new List<string>();
-        if (File.Exists(argsHintFile))
-        {
-            var cached = (await File.ReadAllTextAsync(argsHintFile, cancellationToken)).Trim();
-            if (!string.IsNullOrWhiteSpace(cached))
-            {
-                extractionArgs.Add(cached);
-            }
-        }
+        // Deterministic extraction command for the pinned VC++ 2010 package.
+        var extracted = await RunProcessAsync(
+            vcInstallerPath,
+            $"/q /c /t:\"{extractDir}\"",
+            useShellExecute: false,
+            runAsAdmin: false,
+            cancellationToken: cancellationToken);
 
-        // Different VC++ packages support different extraction switches.
-        var knownArgs = new[]
-        {
-            $"/extract:\"{extractDir}\" /q",
-            $"/q /extract:\"{extractDir}\"",
-            $"/Q /T:\"{extractDir}\" /C",
-            $"/c /t:\"{extractDir}\""
-        };
-        extractionArgs.AddRange(knownArgs.Where(a => !extractionArgs.Contains(a, StringComparer.OrdinalIgnoreCase)));
-
-        var extracted = false;
-        foreach (var args in extractionArgs)
-        {
-            extracted = await RunProcessAsync(
-                vcInstallerPath,
-                args,
-                useShellExecute: false,
-                runAsAdmin: false,
-                cancellationToken: cancellationToken);
-
-            if (extracted && Directory.EnumerateFiles(extractDir, "*", SearchOption.AllDirectories).Any())
-            {
-                await File.WriteAllTextAsync(argsHintFile, args, cancellationToken);
-                break;
-            }
-        }
-
-        if (!extracted)
+        if (!extracted || !Directory.EnumerateFiles(extractDir, "*", SearchOption.AllDirectories).Any())
         {
             return false;
         }
