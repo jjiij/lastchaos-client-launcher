@@ -31,16 +31,16 @@ jobs:
         run: dotnet test Launcher.WinForms.sln --configuration Release --no-build --verbosity normal
 
       - name: Publish WinForms app
-        run: dotnet publish src/Launcher.UI/Launcher.UI.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:PublishTrimmed=false -o out/launcher
+        run: dotnet publish src/Launcher.UI/Launcher.UI.csproj -c Release -r win-x86 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:PublishTrimmed=false -o out/launcher
 
       - name: Package launcher
         shell: powershell
-        run: Compress-Archive -Path "out/launcher/*" -DestinationPath "lastchaos-launcher-windows-x64.zip" -Force
+        run: Compress-Archive -Path "out/launcher/*" -DestinationPath "lastchaos-launcher-windows-x86.zip" -Force
 
       - name: Upload release artifact
         uses: softprops/action-gh-release@v2
         with:
-          files: lastchaos-launcher-windows-x64.zip
+          files: lastchaos-launcher-windows-x86.zip
           tag_name: latest
           name: Latest Build
           body: "LastChaos WinForms launcher build"

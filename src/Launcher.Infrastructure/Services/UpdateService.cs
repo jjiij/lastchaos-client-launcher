@@ -1,7 +1,7 @@
-using System.IO.Compression;
 using Launcher.Core.Contracts;
 using Launcher.Core.Enums;
 using Launcher.Core.Models;
+using Launcher.Infrastructure.Utilities;
 
 namespace Launcher.Infrastructure.Services;
 
@@ -78,7 +78,7 @@ public sealed class UpdateService : IUpdateService
 
             State = UpdateState.Unzipping;
             if (Directory.Exists(extract)) Directory.Delete(extract, true);
-            ExtractZipWithProgress(zipPath, extract, "assets", cancellationToken);
+            await ExtractArchiveWithProgressAsync(zipPath, extract, "assets", cancellationToken);
 
             var extractedRoot = Path.Combine(extract, $"{_config.AssetsRepo.Split('/')[1]}-{_config.AssetsBranch}");
             if (!Directory.Exists(extractedRoot))
@@ -120,7 +120,7 @@ public sealed class UpdateService : IUpdateService
             await _downloadService.DownloadAsync(asset.BrowserDownloadUrl, downloadPath, _progress, () => _paused, cancellationToken);
 
             if (Directory.Exists(stagePath)) Directory.Delete(stagePath, true);
-            ExtractZipWithProgress(downloadPath, stagePath, "launcher", cancellationToken);
+            await ExtractArchiveWithProgressAsync(downloadPath, stagePath, "launcher", cancellationToken);
 
             await File.WriteAllTextAsync(Path.Combine(_root, ".launcher_version"), release.TagName, cancellationToken);
             State = UpdateState.Completed;
@@ -189,7 +189,7 @@ public sealed class UpdateService : IUpdateService
                 File.Move(downloadedParts[0], gameZip, true);
             }
 
-            ExtractZipWithProgress(gameZip, _root, "game", cancellationToken);
+            await ExtractArchiveWithProgressAsync(gameZip, _root, "game", cancellationToken);
             File.Delete(gameZip);
             await File.WriteAllTextAsync(Path.Combine(_root, ".client_version"), version, cancellationToken);
 
@@ -247,44 +247,23 @@ public sealed class UpdateService : IUpdateService
         }
     }
 
-    private void ExtractZipWithProgress(string zipPath, string destination, string channel, CancellationToken cancellationToken)
+    private async Task ExtractArchiveWithProgressAsync(string archivePath, string destination, string channel, CancellationToken cancellationToken)
     {
-        Directory.CreateDirectory(destination);
-        using var archive = ZipFile.OpenRead(zipPath);
-        var files = archive.Entries.Where(e => !string.IsNullOrEmpty(e.Name)).ToList();
-        var total = Math.Max(files.Count, 1);
-        var processed = 0;
-
-        foreach (var entry in archive.Entries)
+        var progress = new Progress<int>(pct =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            WaitIfPaused(cancellationToken);
-
-            var targetPath = Path.Combine(destination, entry.FullName);
-            var targetDir = Path.GetDirectoryName(targetPath);
-            if (!string.IsNullOrWhiteSpace(targetDir))
-            {
-                Directory.CreateDirectory(targetDir);
-            }
-
-            if (string.IsNullOrEmpty(entry.Name))
-            {
-                continue;
-            }
-
-            entry.ExtractToFile(targetPath, overwrite: true);
-            processed++;
-
-            var percent = Math.Clamp((int)Math.Round(processed * 100d / total), 0, 100);
             _progress?.Report(new ProgressSnapshot
             {
                 State = UpdateState.Unzipping,
-                Percent = percent,
-                StatusText = $"Unpacking {channel}: {entry.Name}",
-                BytesTotal = total,
-                BytesTransferred = processed,
+                Percent = Math.Clamp(pct, 0, 100),
+                StatusText = $"Unpacking {channel}",
                 SpeedBytesPerSecond = 0
             });
+        });
+
+        var ok = await SevenZipUtility.ExtractAsync(_root, archivePath, destination, progress, cancellationToken);
+        if (!ok)
+        {
+            throw new InvalidOperationException($"7zr failed to extract: {Path.GetFileName(archivePath)}");
         }
     }
 }

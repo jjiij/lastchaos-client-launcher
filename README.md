@@ -20,7 +20,8 @@ Modern .NET 8 WinForms launcher replacing the legacy AutoPlay project.
 - Dual progress bars (game/assets) with speed + transferred size details
 - Manual update trigger (no forced auto-download on launch)
 - Repair/checklist flow and legacy config migration support
-- Self-contained publish target for runtime-bundled Windows binaries
+- Self-contained publish target for runtime-bundled Windows x86 binaries
+- Bundled `tools/7zip/7zr.exe` used for all archive extraction (game/assets and VC++ payload extraction)
 
 ## Build (Windows)
 
@@ -47,4 +48,4 @@ dotnet run --project src/Launcher.UI/Launcher.UI.csproj
 
 - Legacy AutoPlay assets/source were intentionally removed from this repository.
 - This repository now tracks only the WinForms launcher codebase.
-- The launcher automatically downloads/extracts required VC++ 2010 runtime DLLs (`msvcp100.dll`, `msvcr100.dll`) into `Bin/` before game launch.
+- Game target is x86; launcher runtime/publish target is `win-x86`.
