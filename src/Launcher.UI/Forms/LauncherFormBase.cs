@@ -37,7 +37,7 @@ public abstract class LauncherFormBase : Form
     protected readonly Button PrimaryButton = new() { Left = 30, Top = 290, Width = 298, Height = 64, Text = "Download / Update", Font = new Font("Segoe UI", 13f, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
     protected readonly Button PauseButton = new() { Left = 338, Top = 290, Width = 78, Height = 64, Text = "Pause", FlatStyle = FlatStyle.Flat };
     protected readonly Button RepairButton = new() { Left = 426, Top = 290, Width = 78, Height = 64, Text = "Repair", FlatStyle = FlatStyle.Flat };
-    protected readonly Button InstallDepsButton = new() { Left = 514, Top = 290, Width = 120, Height = 64, Text = "Install Deps", FlatStyle = FlatStyle.Flat, Visible = false };
+    protected readonly Button InstallDepsButton = new() { Left = 514, Top = 290, Width = 120, Height = 64, Text = "Prepare Deps", FlatStyle = FlatStyle.Flat, Visible = false };
     protected readonly Button SaveButton = new() { Left = 514, Top = 290, Width = 76, Height = 64, Text = "Save", FlatStyle = FlatStyle.Flat };
 
     private CancellationTokenSource? _cts;
@@ -486,18 +486,18 @@ public abstract class LauncherFormBase : Form
         }
 
         ShowHelperProgress("PREREQUISITES", 0, marquee: true);
-        StatusLabel.Text = "Installing dependencies...";
-        _downloadDetailsLabel.Text = "Running VC++/DirectX installers.";
+        StatusLabel.Text = "Preparing dependencies...";
+        _downloadDetailsLabel.Text = "Extracting runtime files from VC++ package.";
 
         var ok = await DependencyInstaller.InstallDependenciesAsync(
             AppContext.BaseDirectory,
-            allowInstallerExecution: true);
+            allowInstallerExecution: false);
 
         HideHelperProgress();
         UpdateDependencyButtonVisibility();
         StatusLabel.Text = ok && HasVc100Runtime()
-            ? "Dependencies installed"
-            : "Dependency install failed";
+            ? "Dependencies ready"
+            : "Dependency preparation failed";
     }
 
     private void UpdateDependencyButtonVisibility()

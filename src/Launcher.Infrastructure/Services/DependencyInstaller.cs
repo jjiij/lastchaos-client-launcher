@@ -8,7 +8,6 @@ public sealed class DependencyInstaller : IDependencyInstaller
     private static readonly string[] RequiredRuntimeDlls = ["msvcp100.dll", "msvcr100.dll"];
 
     private const string Vc2010X86Url = "https://download.microsoft.com/download/C/6/D/C6D0FD4E-9E53-4897-9B91-836EBA2AACD3/vcredist_x86.exe";
-    private const string DirectXWebUrl = "https://download.microsoft.com/download/1/7/1/1718ccc4-6315-4d8e-9543-8e28a4e18c4c/dxwebsetup.exe";
 
     public async Task<bool> InstallDependenciesAsync(
         string launcherRootPath,
@@ -34,30 +33,7 @@ public sealed class DependencyInstaller : IDependencyInstaller
             }
         }
 
-        if (!allowInstallerExecution)
-        {
-            return false;
-        }
-
-        var dx = ResolveLocalInstaller(launcherRootPath, "dxwebsetup.exe");
-        dx ??= await DownloadInstallerAsync(DirectXWebUrl, Path.Combine(cacheRoot, "dxwebsetup.exe"), cancellationToken);
-
-        var ranAnyInstaller = false;
-        var ok = true;
-
-        if (!string.IsNullOrWhiteSpace(vc) && File.Exists(vc))
-        {
-            ranAnyInstaller = true;
-            ok &= await RunInstallerAsync(vc, "/passive /norestart", cancellationToken);
-        }
-
-        if (!string.IsNullOrWhiteSpace(dx) && File.Exists(dx))
-        {
-            ranAnyInstaller = true;
-            ok &= await RunInstallerAsync(dx, "/q", cancellationToken);
-        }
-
-        return ranAnyInstaller && ok && HasRuntimeDllsInBin(launcherRootPath);
+        return false;
     }
 
     private static async Task<bool> TryExtractRuntimeDllsWithSevenZipAsync(
@@ -136,28 +112,6 @@ public sealed class DependencyInstaller : IDependencyInstaller
         catch
         {
             return null;
-        }
-    }
-
-    private static async Task<bool> RunInstallerAsync(string path, string args, CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var process = new System.Diagnostics.Process
-            {
-                StartInfo = new System.Diagnostics.ProcessStartInfo(path, args)
-                {
-                    UseShellExecute = true,
-                    Verb = "runas"
-                }
-            };
-            process.Start();
-            await process.WaitForExitAsync(cancellationToken);
-            return process.ExitCode == 0;
-        }
-        catch
-        {
-            return false;
         }
     }
 
