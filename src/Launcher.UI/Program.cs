@@ -181,22 +181,59 @@ internal static class Program
         var relaunchArgs = string.Join(" ", args.Concat([RelocatedArg]).Select(QuoteArg));
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(targetExe, relaunchArgs)
+            if (!File.Exists(targetExe))
+            {
+                return true;
+            }
+
+            if (TryStartInstalledInstance(targetExe, targetRoot, relaunchArgs))
+            {
+                return false;
+            }
+
+            return true;
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            // Relaunch cancelled by user/UAC flow.
+            return true;
+        }
+        catch
+        {
+            // If restart fails for any reason, keep launcher usable in current location.
+            return true;
+        }
+    }
+
+    private static bool TryStartInstalledInstance(string targetExe, string targetRoot, string relaunchArgs)
+    {
+        try
+        {
+            var shell = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(targetExe, relaunchArgs)
             {
                 WorkingDirectory = targetRoot,
                 UseShellExecute = true
             });
-
-            return false;
-        }
-        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
-        {
-            // Relaunch cancelled by user/UAC flow; always exit setup instance.
-            return false;
+            if (shell is not null) return true;
         }
         catch
         {
-            // If restart fails for any reason, exit setup instance to avoid state files in source location.
+            // fallback below
+        }
+
+        try
+        {
+            var direct = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = targetExe,
+                Arguments = relaunchArgs,
+                WorkingDirectory = targetRoot,
+                UseShellExecute = false
+            });
+            return direct is not null;
+        }
+        catch
+        {
             return false;
         }
     }
