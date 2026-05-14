@@ -109,7 +109,9 @@ public abstract class LauncherFormBase : Form
 
         var pct = Math.Clamp(snapshot.Percent, 0, 100);
         var status = snapshot.StatusText ?? string.Empty;
-        _downloadDetailsLabel.Text = BuildDownloadDetails(snapshot);
+        var (headline, details) = BuildDownloadTextParts(snapshot);
+        StatusLabel.Text = headline;
+        _downloadDetailsLabel.Text = details;
 
         if (status.Contains("assets", StringComparison.OrdinalIgnoreCase) ||
             status.Contains("assets-main.zip", StringComparison.OrdinalIgnoreCase))
@@ -121,7 +123,10 @@ public abstract class LauncherFormBase : Form
             GameProgress.Value = pct;
         }
 
-        StatusLabel.Text = $"{snapshot.State}: {status} ({pct}%)";
+        if (string.IsNullOrWhiteSpace(StatusLabel.Text))
+        {
+            StatusLabel.Text = $"{snapshot.State}: {status} ({pct}%)";
+        }
     }
 
     protected override void OnPaintBackground(PaintEventArgs e)
@@ -443,11 +448,11 @@ public abstract class LauncherFormBase : Form
         }
     }
 
-    private static string BuildDownloadDetails(ProgressSnapshot snapshot)
+    private static (string headline, string details) BuildDownloadTextParts(ProgressSnapshot snapshot)
     {
         if (snapshot.BytesTotal <= 0)
         {
-            return snapshot.StatusText;
+            return (snapshot.StatusText, string.Empty);
         }
 
         var transferred = FormatBytes(snapshot.BytesTransferred);
@@ -463,10 +468,10 @@ public abstract class LauncherFormBase : Form
             : snapshot.StatusText.Trim();
         if (string.IsNullOrWhiteSpace(fileName))
         {
-            return summary;
+            return (summary, string.Empty);
         }
 
-        return $"{summary}\n{fileName}";
+        return (summary, fileName);
     }
 
     private static string FormatBytes(long bytes)
