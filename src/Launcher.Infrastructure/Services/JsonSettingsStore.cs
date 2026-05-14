@@ -34,17 +34,6 @@ public sealed class JsonSettingsStore : ISettingsStore
         var options = new JsonSerializerOptions { WriteIndented = true };
         await using var stream = File.Create(jsonPath);
         await JsonSerializer.SerializeAsync(stream, settings, options, cancellationToken);
-
-        var legacyLine = string.Join(",",
-            settings.HostUrl,
-            settings.NkspLaunchParameter,
-            settings.AllowMultiClient.ToString().ToLowerInvariant(),
-            settings.ServerName,
-            settings.LauncherStyle,
-            settings.AllowVerifyGameFilesFunction.ToString().ToLowerInvariant());
-        await File.WriteAllTextAsync(Path.Combine(_basePath, "lccnct.dta"), legacyLine, cancellationToken);
-        await File.WriteAllTextAsync(Path.Combine(_basePath, "sl.dta"), settings.LoginServer, cancellationToken);
-        await File.WriteAllTextAsync(Path.Combine(_basePath, "vtm.brn"), settings.LocalGameVersion.ToString(), cancellationToken);
     }
 
     private LauncherSettings LoadLegacySettings()

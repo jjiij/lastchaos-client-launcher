@@ -180,13 +180,13 @@ internal static class Program
         }
         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
-            // Relaunch cancelled by user/UAC flow; continue from current location.
-            return true;
+            // Relaunch cancelled by user/UAC flow; always exit setup instance.
+            return false;
         }
         catch
         {
-            // If restart fails for any reason, keep launcher usable in current location.
-            return true;
+            // If restart fails for any reason, exit setup instance to avoid state files in source location.
+            return false;
         }
     }
 
