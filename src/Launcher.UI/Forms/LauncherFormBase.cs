@@ -27,10 +27,10 @@ public abstract class LauncherFormBase : Form
     protected readonly Label StatusLabel = new() { Left = 30, Top = 112, Width = 560, Height = 34, ForeColor = Color.White, BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 11f, FontStyle.Bold), AutoSize = true };
     private readonly Label _downloadDetailsLabel = new() { Left = 30, Top = 146, Width = 560, Height = 44, ForeColor = Color.FromArgb(197, 206, 231), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9.5f, FontStyle.Regular), Text = "No active download.", AutoSize = false };
     private readonly Label _gameProgressLabel = new() { Left = 30, Top = 178, Width = 260, Height = 20, Text = "GAME FILES", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true };
-    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 228, Width = 260, Height = 20, Text = "HELPER", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true };
+    private readonly Label _assetsProgressLabel = new() { Left = 30, Top = 228, Width = 260, Height = 20, Text = "", ForeColor = Color.FromArgb(211, 219, 239), BackColor = Color.FromArgb(12, 16, 28), Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true, Visible = false };
 
     protected readonly ProgressBar GameProgress = new() { Left = 30, Top = 200, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous };
-    protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 250, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous };
+    protected readonly ProgressBar AssetsProgress = new() { Left = 30, Top = 250, Width = 560, Height = 16, Style = ProgressBarStyle.Continuous, Visible = false };
 
     protected readonly Button PrimaryButton = new() { Left = 30, Top = 290, Width = 298, Height = 64, Text = "Download / Update", Font = new Font("Segoe UI", 13f, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
     protected readonly Button PauseButton = new() { Left = 338, Top = 290, Width = 78, Height = 64, Text = "Pause", FlatStyle = FlatStyle.Flat };
@@ -39,6 +39,7 @@ public abstract class LauncherFormBase : Form
 
     private CancellationTokenSource? _cts;
     private bool _isUpdating;
+    private bool _isPreparingRuntime;
 
     protected LauncherFormBase(
         string title,
@@ -120,20 +121,16 @@ public abstract class LauncherFormBase : Form
 
         if (isUnpacking)
         {
-            _assetsProgressLabel.Text = "UNPACKING";
-            AssetsProgress.Style = ProgressBarStyle.Continuous;
-            AssetsProgress.Value = pct;
+            ShowHelperProgress("UNPACKING", pct, marquee: false);
         }
         else
         {
             _gameProgressLabel.Text = isAssetsWork ? "ASSETS" : "GAME FILES";
             GameProgress.Style = ProgressBarStyle.Continuous;
             GameProgress.Value = pct;
-            if (snapshot.State != UpdateState.Paused)
+            if (snapshot.State != UpdateState.Paused && !_isPreparingRuntime)
             {
-                _assetsProgressLabel.Text = "HELPER";
-                AssetsProgress.Style = ProgressBarStyle.Continuous;
-                AssetsProgress.Value = 0;
+                HideHelperProgress();
             }
         }
 
@@ -196,6 +193,7 @@ public abstract class LauncherFormBase : Form
         LoadNews();
         UpdatePrimaryButtonLabel();
         StatusLabel.Text = "Launcher ready. Checking updates in background...";
+        _ = PrepareRuntimeDependenciesAsync();
     }
 
     private void ApplyResponsiveLayout()
@@ -334,22 +332,20 @@ public abstract class LauncherFormBase : Form
         {
             StatusLabel.Text = "Runtime missing. Preparing prerequisites...";
             _downloadDetailsLabel.Text = "Downloading/extracting VC++ runtime DLLs...";
-            _assetsProgressLabel.Text = "PREREQUISITES";
-            AssetsProgress.Style = ProgressBarStyle.Marquee;
+            ShowHelperProgress("PREREQUISITES", 0, marquee: true);
             var installOk = await DependencyInstaller.InstallDependenciesAsync(AppContext.BaseDirectory);
-            AssetsProgress.Style = ProgressBarStyle.Continuous;
-            AssetsProgress.Value = installOk ? 100 : 0;
+            ShowHelperProgress("PREREQUISITES", installOk ? 100 : 0, marquee: false);
             if (!installOk || !HasVc100Runtime())
             {
                 StatusLabel.Text = "Dependency install failed";
                 _downloadDetailsLabel.Text = "Automatic runtime setup failed (VC++/DirectX).";
-                _assetsProgressLabel.Text = "HELPER";
+                HideHelperProgress();
                 return;
             }
 
             StatusLabel.Text = "Runtime ready. Launching game...";
             _downloadDetailsLabel.Text = "VC++ runtime setup completed automatically.";
-            _assetsProgressLabel.Text = "HELPER";
+            HideHelperProgress();
         }
 
         var ok = await GameLauncher.LaunchAsync(AppContext.BaseDirectory, Settings.NkspLaunchParameter);
@@ -399,6 +395,51 @@ public abstract class LauncherFormBase : Form
     private void UpdatePrimaryButtonLabel()
     {
         PrimaryButton.Text = HasLaunchableGame() ? "Launch Game" : "Download / Update";
+    }
+
+    private async Task PrepareRuntimeDependenciesAsync()
+    {
+        if (HasVc100Runtime() || _isPreparingRuntime)
+        {
+            return;
+        }
+
+        _isPreparingRuntime = true;
+        ShowHelperProgress("PREREQUISITES", 0, marquee: true);
+        _downloadDetailsLabel.Text = "Preparing runtime dependencies in background...";
+
+        var ok = await DependencyInstaller.InstallDependenciesAsync(AppContext.BaseDirectory);
+        _isPreparingRuntime = false;
+
+        if (ok && HasVc100Runtime())
+        {
+            _downloadDetailsLabel.Text = "Runtime dependencies ready.";
+            HideHelperProgress();
+            return;
+        }
+
+        _downloadDetailsLabel.Text = "Runtime dependencies will be retried on launch.";
+        HideHelperProgress();
+    }
+
+    private void ShowHelperProgress(string label, int percent, bool marquee)
+    {
+        _assetsProgressLabel.Text = label;
+        _assetsProgressLabel.Visible = true;
+        AssetsProgress.Visible = true;
+        AssetsProgress.Style = marquee ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
+        if (!marquee)
+        {
+            AssetsProgress.Value = Math.Clamp(percent, 0, 100);
+        }
+    }
+
+    private void HideHelperProgress()
+    {
+        _assetsProgressLabel.Visible = false;
+        AssetsProgress.Visible = false;
+        AssetsProgress.Style = ProgressBarStyle.Continuous;
+        AssetsProgress.Value = 0;
     }
 
     private void ApplySkinBackground()
