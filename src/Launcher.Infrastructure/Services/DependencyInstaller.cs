@@ -205,14 +205,26 @@ public sealed class DependencyInstaller : IDependencyInstaller
         }
         Directory.CreateDirectory(extractDir);
 
+        var argsHintFile = Path.Combine(cacheRoot, "vc_extract_args.txt");
+        var extractionArgs = new List<string>();
+        if (File.Exists(argsHintFile))
+        {
+            var cached = (await File.ReadAllTextAsync(argsHintFile, cancellationToken)).Trim();
+            if (!string.IsNullOrWhiteSpace(cached))
+            {
+                extractionArgs.Add(cached);
+            }
+        }
+
         // Different VC++ packages support different extraction switches.
-        var extractionArgs = new[]
+        var knownArgs = new[]
         {
             $"/extract:\"{extractDir}\" /q",
             $"/q /extract:\"{extractDir}\"",
             $"/Q /T:\"{extractDir}\" /C",
             $"/c /t:\"{extractDir}\""
         };
+        extractionArgs.AddRange(knownArgs.Where(a => !extractionArgs.Contains(a, StringComparer.OrdinalIgnoreCase)));
 
         var extracted = false;
         foreach (var args in extractionArgs)
@@ -226,6 +238,7 @@ public sealed class DependencyInstaller : IDependencyInstaller
 
             if (extracted && Directory.EnumerateFiles(extractDir, "*", SearchOption.AllDirectories).Any())
             {
+                await File.WriteAllTextAsync(argsHintFile, args, cancellationToken);
                 break;
             }
         }
