@@ -451,6 +451,19 @@ public abstract class LauncherFormBase : Form
 
     private static (string headline, string details) BuildDownloadTextParts(ProgressSnapshot snapshot)
     {
+        if (snapshot.StatusText.StartsWith("Unpacking ", StringComparison.OrdinalIgnoreCase))
+        {
+            var marker = snapshot.StatusText.IndexOf(':');
+            if (marker > -1 && marker < snapshot.StatusText.Length - 1)
+            {
+                var headline = $"Unpacking... Progress {snapshot.Percent}%";
+                var details = snapshot.StatusText[(marker + 1)..].Trim();
+                return (headline, details);
+            }
+
+            return ($"Unpacking... Progress {snapshot.Percent}%", snapshot.StatusText);
+        }
+
         if (snapshot.BytesTotal <= 0)
         {
             return (snapshot.StatusText, string.Empty);
