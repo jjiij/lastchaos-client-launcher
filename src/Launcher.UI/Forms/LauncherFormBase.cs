@@ -486,7 +486,12 @@ public abstract class LauncherFormBase : Form
             unit++;
         }
 
-        return $"{value:0.##} {units[unit]}";
+        if (unit == 0)
+        {
+            return $"{value:0} {units[unit]}";
+        }
+
+        return $"{value:0.00} {units[unit]}";
     }
 
     private sealed class NewsItem
