@@ -21,6 +21,15 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Download bundled 7zr
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Path "src/Launcher.UI/tools/7zip" -Force | Out-Null
+          Invoke-WebRequest -Uri "https://www.7-zip.org/a/7zr.exe" -OutFile "src/Launcher.UI/tools/7zip/7zr.exe"
+          if (-not (Test-Path "src/Launcher.UI/tools/7zip/7zr.exe")) {
+            throw "7zr.exe download failed."
+          }
+
       - name: Restore
         run: dotnet restore Launcher.WinForms.sln
 
