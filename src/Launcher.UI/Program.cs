@@ -137,9 +137,29 @@ internal static class Program
             var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             Directory.CreateDirectory(desktop);
             var shortcutPath = Path.Combine(desktop, "LastChaos Genesis.url");
-            var exePath = Environment.ProcessPath ?? Path.Combine(installRoot, "Launcher.UI.exe");
+            var exeName = Path.GetFileName(Environment.ProcessPath);
+            if (string.IsNullOrWhiteSpace(exeName))
+            {
+                exeName = "Launcher.UI.exe";
+            }
+
+            var exePath = Path.Combine(installRoot, exeName);
+            if (!File.Exists(exePath))
+            {
+                // Fallback for first run before relocation copy settles.
+                exePath = Environment.ProcessPath ?? exePath;
+            }
+
             var gameExe = Path.Combine(installRoot, "Bin", "Nksp.exe");
-            var iconPath = File.Exists(gameExe) ? gameExe : exePath;
+            var iconCandidates = new[]
+            {
+                Path.Combine(installRoot, "LastChaosGenesis.ico"),
+                Path.Combine(installRoot, "LastChaos.ico"),
+                Path.Combine(installRoot, "icon.ico"),
+                gameExe,
+                exePath
+            };
+            var iconPath = iconCandidates.FirstOrDefault(File.Exists) ?? exePath;
 
             var content = "[InternetShortcut]\r\n" +
                           $"URL=file:///{exePath.Replace('\\', '/')}\r\n" +
