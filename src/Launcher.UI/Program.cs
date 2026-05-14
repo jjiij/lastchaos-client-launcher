@@ -168,7 +168,20 @@ internal static class Program
         }
 
         Directory.CreateDirectory(targetRoot);
-        CopyDirectory(currentRoot, targetRoot);
+        using var progress = new RelocationProgressForm();
+        progress.Show();
+        progress.BringToFront();
+        Application.DoEvents();
+
+        CopyDirectory(currentRoot, targetRoot, (percent, detail) =>
+        {
+            progress.UpdateProgress(percent, detail);
+            Application.DoEvents();
+        });
+
+        progress.UpdateProgress(100, "Finalizing...");
+        Application.DoEvents();
+        progress.Close();
         EnsureDesktopShortcut(targetRoot);
 
         var exePath = Environment.ProcessPath;
@@ -299,20 +312,28 @@ internal static class Program
         }
     }
 
-    private static void CopyDirectory(string source, string destination)
+    private static void CopyDirectory(string source, string destination, Action<int, string>? onProgress = null)
     {
+        var files = Directory.GetFiles(source, "*", SearchOption.AllDirectories);
+        var total = Math.Max(files.Length, 1);
+        var copied = 0;
+
         foreach (var dir in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
         {
             var relativeDir = Path.GetRelativePath(source, dir);
             Directory.CreateDirectory(Path.Combine(destination, relativeDir));
         }
 
-        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        foreach (var file in files)
         {
             var relative = Path.GetRelativePath(source, file);
             var target = Path.Combine(destination, relative);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(file, target, overwrite: true);
+            copied++;
+
+            var pct = Math.Clamp((int)Math.Round(copied * 100d / total), 0, 100);
+            onProgress?.Invoke(pct, $"Installing to AppData... {Path.GetFileName(file)}");
         }
     }
 
@@ -329,6 +350,47 @@ internal static class Program
         }
 
         return "\"" + arg.Replace("\"", "\\\"") + "\"";
+    }
+
+    private sealed class RelocationProgressForm : Form
+    {
+        private readonly Label _label = new()
+        {
+            Left = 20,
+            Top = 18,
+            Width = 440,
+            Height = 24,
+            Text = "Installing to AppData..."
+        };
+
+        private readonly ProgressBar _progress = new()
+        {
+            Left = 20,
+            Top = 52,
+            Width = 440,
+            Height = 18,
+            Style = ProgressBarStyle.Continuous
+        };
+
+        public RelocationProgressForm()
+        {
+            Text = "LastChaos Genesis Setup";
+            Width = 500;
+            Height = 130;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            ShowInTaskbar = true;
+            StartPosition = FormStartPosition.CenterScreen;
+            Controls.Add(_label);
+            Controls.Add(_progress);
+        }
+
+        public void UpdateProgress(int percent, string text)
+        {
+            _progress.Value = Math.Clamp(percent, 0, 100);
+            _label.Text = $"{text} ({percent}%)";
+        }
     }
 
     private static LauncherFormBase CreateForm(
