@@ -35,6 +35,7 @@ public abstract class LauncherFormBase : Form
     protected readonly Button PrimaryButton = new() { Left = 30, Top = 290, Width = 298, Height = 64, Text = "Download / Update", Font = new Font("Segoe UI", 13f, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
     protected readonly Button PauseButton = new() { Left = 338, Top = 290, Width = 78, Height = 64, Text = "Pause", FlatStyle = FlatStyle.Flat };
     protected readonly Button RepairButton = new() { Left = 426, Top = 290, Width = 78, Height = 64, Text = "Repair", FlatStyle = FlatStyle.Flat };
+    protected readonly Button InstallDepsButton = new() { Left = 514, Top = 290, Width = 120, Height = 64, Text = "Install Deps", FlatStyle = FlatStyle.Flat, Visible = false };
     protected readonly Button SaveButton = new() { Left = 514, Top = 290, Width = 76, Height = 64, Text = "Save", FlatStyle = FlatStyle.Flat };
 
     private CancellationTokenSource? _cts;
@@ -84,6 +85,7 @@ public abstract class LauncherFormBase : Form
             PrimaryButton,
             PauseButton,
             RepairButton,
+            InstallDepsButton,
             SaveButton
         ]);
 
@@ -92,6 +94,7 @@ public abstract class LauncherFormBase : Form
         PrimaryButton.Click += async (_, _) => await OnPrimaryActionAsync();
         PauseButton.Click += (_, _) => TogglePause();
         RepairButton.Click += async (_, _) => await RunRepairAsync();
+        InstallDepsButton.Click += async (_, _) => await InstallDependenciesWithInstallersAsync();
         SaveButton.Click += async (_, _) => await SaveSettingsAsync();
 
         Load += (_, _) => OnLauncherLoaded();
@@ -171,6 +174,7 @@ public abstract class LauncherFormBase : Form
         StyleButton(PrimaryButton, Color.FromArgb(50, 156, 255), Color.White);
         StyleButton(PauseButton, Color.FromArgb(47, 59, 86), Color.White);
         StyleButton(RepairButton, Color.FromArgb(47, 59, 86), Color.White);
+        StyleButton(InstallDepsButton, Color.FromArgb(110, 72, 29), Color.White);
         StyleButton(SaveButton, Color.FromArgb(47, 59, 86), Color.White);
 
         GameProgress.ForeColor = Color.FromArgb(77, 181, 255);
@@ -195,6 +199,7 @@ public abstract class LauncherFormBase : Form
         ApplyResponsiveLayout();
         LoadNews();
         UpdatePrimaryButtonLabel();
+        UpdateDependencyButtonVisibility();
         StatusLabel.Text = "Launcher ready. Checking updates in background...";
         _ = PrepareRuntimeDependenciesAsync();
     }
@@ -244,13 +249,21 @@ public abstract class LauncherFormBase : Form
 
         AssetsProgress.SetBounds(30, y, contentWidth, 16);
 
-        var secondaryTotal = 3;
-        var secondaryWidth = Math.Max(82, (contentWidth - 280 - (buttonGap * 3)) / secondaryTotal);
+        var auxButtonCount = InstallDepsButton.Visible ? 4 : 3;
+        var secondaryWidth = Math.Max(82, (contentWidth - 280 - (buttonGap * auxButtonCount)) / auxButtonCount);
         var buttonTop = _actionPanel.Height - buttonHeight - actionBottomPadding;
         PrimaryButton.SetBounds(30, buttonTop, 280, buttonHeight);
         PauseButton.SetBounds(PrimaryButton.Right + buttonGap, buttonTop, secondaryWidth, buttonHeight);
         RepairButton.SetBounds(PauseButton.Right + buttonGap, buttonTop, secondaryWidth, buttonHeight);
-        SaveButton.SetBounds(RepairButton.Right + buttonGap, buttonTop, secondaryWidth, buttonHeight);
+        if (InstallDepsButton.Visible)
+        {
+            InstallDepsButton.SetBounds(RepairButton.Right + buttonGap, buttonTop, secondaryWidth, buttonHeight);
+            SaveButton.SetBounds(InstallDepsButton.Right + buttonGap, buttonTop, secondaryWidth, buttonHeight);
+        }
+        else
+        {
+            SaveButton.SetBounds(RepairButton.Right + buttonGap, buttonTop, secondaryWidth, buttonHeight);
+        }
     }
 
     private async Task OnPrimaryActionAsync()
@@ -354,12 +367,14 @@ public abstract class LauncherFormBase : Form
                 StatusLabel.Text = "Dependency install failed";
                 _downloadDetailsLabel.Text = "Automatic runtime setup failed (VC++/DirectX).";
                 HideHelperProgress();
+                UpdateDependencyButtonVisibility();
                 return;
             }
 
             StatusLabel.Text = "Runtime ready. Launching game...";
             _downloadDetailsLabel.Text = "VC++ runtime setup completed automatically.";
             HideHelperProgress();
+            UpdateDependencyButtonVisibility();
         }
 
         var ok = await GameLauncher.LaunchAsync(AppContext.BaseDirectory, Settings.NkspLaunchParameter);
@@ -429,11 +444,13 @@ public abstract class LauncherFormBase : Form
         {
             _downloadDetailsLabel.Text = "Runtime dependencies ready.";
             HideHelperProgress();
+            UpdateDependencyButtonVisibility();
             return;
         }
 
         _downloadDetailsLabel.Text = "Runtime dependencies will be retried on launch.";
         HideHelperProgress();
+        UpdateDependencyButtonVisibility();
     }
 
     private void ShowHelperProgress(string label, int percent, bool marquee)
@@ -454,6 +471,41 @@ public abstract class LauncherFormBase : Form
         AssetsProgress.Visible = false;
         AssetsProgress.Style = ProgressBarStyle.Continuous;
         AssetsProgress.Value = 0;
+    }
+
+    private async Task InstallDependenciesWithInstallersAsync()
+    {
+        if (HasVc100Runtime())
+        {
+            UpdateDependencyButtonVisibility();
+            return;
+        }
+
+        ShowHelperProgress("PREREQUISITES", 0, marquee: true);
+        StatusLabel.Text = "Installing dependencies...";
+        _downloadDetailsLabel.Text = "Running VC++/DirectX installers.";
+
+        var ok = await DependencyInstaller.InstallDependenciesAsync(
+            AppContext.BaseDirectory,
+            allowInstallerExecution: true);
+
+        HideHelperProgress();
+        UpdateDependencyButtonVisibility();
+        StatusLabel.Text = ok && HasVc100Runtime()
+            ? "Dependencies installed"
+            : "Dependency install failed";
+    }
+
+    private void UpdateDependencyButtonVisibility()
+    {
+        var visible = !HasVc100Runtime();
+        if (InstallDepsButton.Visible == visible)
+        {
+            return;
+        }
+
+        InstallDepsButton.Visible = visible;
+        ApplyResponsiveLayout();
     }
 
     private void ApplySkinBackground()
