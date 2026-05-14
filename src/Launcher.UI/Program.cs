@@ -148,6 +148,11 @@ internal static class Program
         }
 
         var currentRoot = Path.GetFullPath(AppContext.BaseDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (IsPortableLocation(currentRoot))
+        {
+            return true;
+        }
+
         var targetRoot = GetInstallRoot().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
         if (string.Equals(currentRoot, targetRoot, StringComparison.OrdinalIgnoreCase))
@@ -186,6 +191,25 @@ internal static class Program
         catch
         {
             // If restart fails for any reason, exit setup instance to avoid state files in source location.
+            return false;
+        }
+    }
+
+    private static bool IsPortableLocation(string currentRoot)
+    {
+        try
+        {
+            var rootPath = Path.GetPathRoot(currentRoot);
+            if (string.IsNullOrWhiteSpace(rootPath))
+            {
+                return false;
+            }
+
+            var drive = new DriveInfo(rootPath);
+            return drive.DriveType == DriveType.Removable;
+        }
+        catch
+        {
             return false;
         }
     }
